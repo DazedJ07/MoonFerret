@@ -19,6 +19,10 @@
   /* Structural Borders — sharp, geometric, architectural */
   --border-main: #1A1A1A;
 
+  /* Brand Accents */
+  --color-brand: #7ec8e3;
+  --color-brand-foreground: #ffffff;
+
   /* Legacy compat */
   --background: var(--bg-canvas);
   --foreground: var(--text-primary);

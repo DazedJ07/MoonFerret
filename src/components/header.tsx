@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Search, ChevronDown, User, Image as ImageIcon, X, Save, LogOut, Sun, Moon, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { supabase } from '@/lib/supabase';
+import { supabase, uploadImageToStorage } from '@/lib/supabase';
 
 interface HeaderProps {
   title?: string;
@@ -38,6 +38,7 @@ export default function Header({
   const [tempTitle, setTempTitle] = useState(workspaceTitle);
   const [tempPic, setTempPic] = useState<string | null>(profilePic);
   const [logoError, setLogoError] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Interface Theme States
   const [activeTheme, setActiveTheme] = useState('Minimalist Blue');
@@ -127,11 +128,15 @@ export default function Header({
     setIsProfileModalOpen(true);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setTempPic(url);
+      setIsUploading(true);
+      const url = await uploadImageToStorage(file, 'avatars');
+      if (url) {
+        setTempPic(url);
+      }
+      setIsUploading(false);
     }
   };
 
@@ -358,14 +363,18 @@ export default function Header({
               <form onSubmit={handleSave} className="space-y-4 text-xs font-sans">
                 <div className="flex items-center gap-4">
                   <div className="relative w-16 h-16 rounded-full bg-canvas overflow-hidden border border-border-main/20 flex items-center justify-center group">
-                    {tempPic ? (
+                    {isUploading ? (
+                      <div className="w-full h-full flex items-center justify-center bg-stone-900/30">
+                        <div className="w-5 h-5 rounded-full border-2 border-stone-400 border-t-brand animate-spin" />
+                      </div>
+                    ) : tempPic ? (
                       <img src={tempPic} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
                       <User className="w-6 h-6 text-stone-400" />
                     )}
-                    <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                    <label className={`absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${isUploading ? 'pointer-events-none' : ''}`}>
                       <ImageIcon className="w-4 h-4 text-white" />
-                      <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                      <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={isUploading} />
                     </label>
                   </div>
                   <div className="flex-1 space-y-1.5">
@@ -476,10 +485,11 @@ export default function Header({
                   </button>
                   <button
                     type="submit"
-                    className="h-8.5 px-4 rounded-full bg-brand text-brand-foreground font-bold hover:brightness-95 shadow-sm flex items-center gap-1"
+                    disabled={isUploading}
+                    className="h-8.5 px-4 rounded-full bg-brand text-brand-foreground font-bold hover:brightness-95 shadow-sm flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                   >
                     <Save className="w-3.5 h-3.5" />
-                    Save Settings
+                    {isUploading ? 'Uploading...' : 'Save Settings'}
                   </button>
                 </div>
               </form>

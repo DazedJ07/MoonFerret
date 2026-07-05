@@ -13,7 +13,7 @@ import type { Space } from '@/data/mock-data';
 import type { IndividualItem, StorageUnit } from '@/components/views/dashboard-view';
 import { X, Image as ImageIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { supabase } from '@/lib/supabase';
+import { supabase, uploadImageToStorage } from '@/lib/supabase';
 import AuthGateway from '@/components/auth-gateway';
 
 export default function Home() {
@@ -56,6 +56,7 @@ export default function Home() {
   const [spaceQtyInput, setSpaceQtyInput] = useState(2);
   const [spaceDimInput, setSpaceDimInput] = useState('');
   const [spaceImageInput, setSpaceImageInput] = useState<string | null>(null);
+  const [isSpaceUploading, setIsSpaceUploading] = useState(false);
 
   // 1. Direct Callback: Carousel slide changes activeView and carousel state directly
   const handleCarouselChange = useCallback((index: number) => {
@@ -317,11 +318,15 @@ export default function Home() {
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const localUrl = URL.createObjectURL(file);
-      setSpaceImageInput(localUrl);
+      setIsSpaceUploading(true);
+      const url = await uploadImageToStorage(file, 'spaces');
+      if (url) {
+        setSpaceImageInput(url);
+      }
+      setIsSpaceUploading(false);
     }
   };
 
@@ -545,16 +550,17 @@ export default function Home() {
                 <div className="space-y-1">
                   <label className="font-bold text-secondary">Space Background Image</label>
                   <div className="relative h-9">
-                    <input
+                     <input
                       type="file"
                       accept="image/*"
                       onChange={handleImageChange}
+                      disabled={isSpaceUploading}
                       className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
                     />
                     <div className="absolute inset-0 bg-canvas/30 rounded-xl border border-border-main/40 flex items-center justify-center gap-1.5 hover:bg-canvas/50">
                       <ImageIcon className="w-3.5 h-3.5 text-secondary" />
                       <span className="text-[10px] text-secondary font-medium">
-                        {spaceImageInput ? 'Selected ✅' : 'Choose File'}
+                        {isSpaceUploading ? 'Uploading...' : spaceImageInput ? 'Selected ✅' : 'Choose File'}
                       </span>
                     </div>
                   </div>
@@ -570,9 +576,10 @@ export default function Home() {
                   </button>
                   <button
                     type="submit"
-                    className="h-8.5 px-4 rounded-full bg-sky-500 text-white font-bold hover:bg-sky-600 shadow-sm"
+                    disabled={isSpaceUploading}
+                    className="h-8.5 px-4 rounded-full bg-sky-500 text-white font-bold hover:bg-sky-600 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                   >
-                    Create Space
+                    {isSpaceUploading ? 'Uploading...' : 'Create Space'}
                   </button>
                 </div>
               </form>
