@@ -14,6 +14,7 @@ import type { IndividualItem, StorageUnit } from '@/components/views/dashboard-v
 import { X, Image as ImageIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '@/lib/supabase';
+import AuthGateway from '@/components/auth-gateway';
 
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
@@ -28,6 +29,8 @@ export default function Home() {
 
   // Anchoring authenticated user session
   const [userId, setUserId] = useState<string | null>(null);
+  const [session, setSession] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   // States initialized to empty array or null (awaiting Supabase hydration)
   const [spacesList, setSpacesList] = useState<Space[]>([]);
@@ -202,22 +205,51 @@ export default function Home() {
 
     const initSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          setUserId(session.user.id);
-          fetchDashboardData(session.user.id);
-        } else {
-          // If no active auth session (dev mode fallback), use a mock uid for previewing backend integration
-          const mockUid = '00000000-0000-0000-0000-000000000000';
-          setUserId(mockUid);
-          fetchDashboardData(mockUid);
+        // Enforce 15-day session memory lifespan limit
+        const loginTimeStr = localStorage.getItem('moonferret-login-time');
+        if (loginTimeStr) {
+          const loginTime = parseInt(loginTimeStr);
+          const fifteenDaysInMs = 15 * 24 * 60 * 60 * 1000;
+          if (Date.now() - loginTime > fifteenDaysInMs) {
+            // Expired! Sign out.
+            await supabase.auth.signOut();
+            localStorage.removeItem('moonferret-login-time');
+            setSession(null);
+            setUserId(null);
+            setAuthLoading(false);
+            return;
+          }
+        }
+
+        const { data: { session: activeSession } } = await supabase.auth.getSession();
+        setSession(activeSession);
+        if (activeSession?.user) {
+          setUserId(activeSession.user.id);
+          fetchDashboardData(activeSession.user.id);
         }
       } catch (err) {
         console.warn('Auth session check fail:', err);
+      } finally {
+        setAuthLoading(false);
       }
     };
 
     initSession();
+
+    // Subscribe to auth state updates
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+      setSession(currentSession);
+      if (currentSession?.user) {
+        setUserId(currentSession.user.id);
+        fetchDashboardData(currentSession.user.id);
+      } else {
+        setUserId(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [isMounted, fetchDashboardData]);
 
   // CRUD: Space mutations
@@ -340,7 +372,7 @@ export default function Home() {
   const totalCapacity = storageUnitsList.reduce((acc, unit) => acc + unit.capacity, 0);
   const utilizationRate = totalCapacity > 0 ? Math.min(100, Math.round((totalItemsCount / totalCapacity) * 100)) : 0;
 
-  if (!isMounted) {
+  if (!isMounted || authLoading) {
     return (
       <div className="min-h-screen bg-canvas flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
@@ -351,11 +383,26 @@ export default function Home() {
     );
   }
 
+  // Display the Auth Gateway if user session is null
+  if (!session) {
+    return (
+      <AuthGateway 
+        onSuccess={(activeSession) => {
+          setSession(activeSession);
+          if (activeSession?.user) {
+            setUserId(activeSession.user.id);
+            fetchDashboardData(activeSession.user.id);
+          }
+        }} 
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-canvas pb-8">
       {/* Top Header — sky-blue accent banner running edge-to-edge flush with screen top */}
       <Header 
-        title="LaMoon" 
+        title="MoonFerret" 
         userName={userName}
         setUserName={setUserName}
         workspaceTitle={workspaceTitle}

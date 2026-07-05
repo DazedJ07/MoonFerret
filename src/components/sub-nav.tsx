@@ -19,28 +19,28 @@ const tabs: { id: SubNavTab; label: string; icon: typeof Package }[] = [
 
 export default function SubNav({ activeTab, onTabChange }: SubNavProps) {
   return (
-    <div className="flex items-center gap-1 p-1 bg-canvas border border-border-main w-fit">
+    <div className="flex items-center gap-1 p-1 bg-card border border-border-main/45 rounded-full w-fit shadow-sm">
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         return (
           <motion.button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`relative flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors duration-150 ${
+            className={`relative flex items-center gap-2 px-4.5 py-1.5 text-xs font-semibold rounded-full transition-colors duration-150 ${
               isActive ? 'text-primary' : 'text-secondary hover:text-primary'
             }`}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             transition={{ type: 'spring', stiffness: 400, damping: 20 }}
           >
             {isActive && (
               <motion.div
                 layoutId="activeSubTab"
-                className="absolute inset-0 bg-card border border-border-main"
+                className="absolute inset-0 bg-brand/10 rounded-full border border-brand/25"
                 transition={{ type: 'spring', stiffness: 350, damping: 30 }}
               />
             )}
-            <span className="relative z-10 flex items-center gap-2">
+            <span className="relative z-10 flex items-center gap-1.5">
               <tab.icon className="w-3.5 h-3.5" />
               {tab.label}
             </span>
