@@ -418,12 +418,7 @@ function MyNotesView({ notes, setNotes, userId }: MyNotesViewProps) {
 /* ────────────────────────────────────────────────────────
    3. TODO LIST VIEW (tasks state + completedTasksHistory state)
    ──────────────────────────────────────────────────────── */
-const initialTodos = [
-  { id: 't-1', text: 'Reallocate USB cables to living room cabinet', spaceId: 'living-room', priority: 'Medium', done: false },
-  { id: 't-2', text: 'Check TV console battery replacement', spaceId: 'living-room', priority: 'Low', done: false },
-  { id: 't-3', text: 'Refill liquid hand soap in comfort room vanity', spaceId: 'comfort-room', priority: 'High', done: true },
-  { id: 't-4', text: 'Clean and reorganize the upper kitchen cabinets', spaceId: 'kitchen', priority: 'High', done: false },
-];
+const initialTodos: { id: string; text: string; spaceId: string; priority: string; done: boolean }[] = [];
 
 function TodoListView({ spaces }: { spaces: Space[] }) {
   const [todos, setTodos] = useState(initialTodos);
