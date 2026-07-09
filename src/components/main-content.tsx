@@ -246,9 +246,10 @@ function MyOutfitsView({
 interface MyNotesViewProps {
   notes: { id: string; title: string; body: string; date: string }[];
   setNotes: React.Dispatch<React.SetStateAction<{ id: string; title: string; body: string; date: string }[]>>;
+  userId: string | null;
 }
 
-function MyNotesView({ notes, setNotes }: MyNotesViewProps) {
+function MyNotesView({ notes, setNotes, userId }: MyNotesViewProps) {
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [editorTitle, setEditorTitle] = useState('');
   const [editorBody, setEditorBody] = useState('');
@@ -259,20 +260,47 @@ function MyNotesView({ notes, setNotes }: MyNotesViewProps) {
     setEditorBody(note.body);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!editorTitle.trim() || !editorBody.trim()) return;
 
     if (activeNoteId) {
       setNotes(prev => prev.map(n => n.id === activeNoteId ? { ...n, title: editorTitle, body: editorBody } : n));
+      
+      if (userId) {
+        try {
+          await supabase.from('notes').update({
+            title: editorTitle.trim(),
+            body: editorBody.trim(),
+          }).eq('id', activeNoteId).eq('user_id', userId);
+        } catch (err) {
+          console.error('Error updating note:', err);
+        }
+      }
     } else {
+      const newId = `n-${Date.now()}`;
+      const dateStr = new Date().toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' });
       const newNote = {
-        id: `n-${Date.now()}`,
-        title: editorTitle,
-        body: editorBody,
-        date: new Date().toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' })
+        id: newId,
+        title: editorTitle.trim(),
+        body: editorBody.trim(),
+        date: dateStr
       };
       setNotes(prev => [newNote, ...prev]);
-      setActiveNoteId(newNote.id);
+      setActiveNoteId(newId);
+
+      if (userId) {
+        try {
+          await supabase.from('notes').insert({
+            id: newId,
+            title: editorTitle.trim(),
+            body: editorBody.trim(),
+            date: dateStr,
+            user_id: userId
+          });
+        } catch (err) {
+          console.error('Error creating note:', err);
+        }
+      }
     }
   };
 
@@ -282,11 +310,19 @@ function MyNotesView({ notes, setNotes }: MyNotesViewProps) {
     setEditorBody('');
   };
 
-  const deleteNote = (id: string, e: React.MouseEvent) => {
+  const deleteNote = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setNotes(prev => prev.filter(n => n.id !== id));
     if (activeNoteId === id) {
       createNew();
+    }
+
+    if (userId) {
+      try {
+        await supabase.from('notes').delete().eq('id', id).eq('user_id', userId);
+      } catch (err) {
+        console.error('Error deleting note:', err);
+      }
     }
   };
 
@@ -648,7 +684,7 @@ export default function MainContent({
                   userId={userId}
                 />
               )}
-              {activeTab === 'my-notes' && <MyNotesView notes={notesList} setNotes={setNotesList} />}
+              {activeTab === 'my-notes' && <MyNotesView notes={notesList} setNotes={setNotesList} userId={userId} />}
               {activeTab === 'todo-list' && <TodoListView spaces={spaces} />}
             </div>
           )}

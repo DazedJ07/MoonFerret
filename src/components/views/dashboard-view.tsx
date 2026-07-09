@@ -314,15 +314,20 @@ export default function DashboardView({
     compartments: number;
     capacity: number;
     imageUrl: string | null;
+    spaceId?: string;
   }) => {
-    if (!activeSpaceId) return;
+    const targetSpaceId = storageData.spaceId || activeSpaceId;
+    if (!targetSpaceId) {
+      alert('Please create or select a space first.');
+      return;
+    }
 
-    const matchedSpace = spaces.find(s => s.id === activeSpaceId);
+    const matchedSpace = spaces.find(s => s.id === targetSpaceId);
     const parentId = `su-${Date.now()}`;
     const newStorage: StorageUnit = {
       id: parentId,
       name: storageData.name,
-      spaceId: activeSpaceId,
+      spaceId: targetSpaceId,
       spaceName: matchedSpace?.name || 'Custom Space',
       parentId: storageData.parentId,
       totalItems: 0,
@@ -882,6 +887,7 @@ export default function DashboardView({
         existingStorages={storageUnitsList}
         activeSpaceId={activeSpaceId}
         defaultParentId={selectedStorageId}
+        spaces={spaces}
       />
 
       <AddAssetModal 
