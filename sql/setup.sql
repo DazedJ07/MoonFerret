@@ -14,6 +14,13 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Ensure all columns exist on profiles table
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS username TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS display_name TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS workspace_title TEXT DEFAULT 'MoonFerret Home';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS profile_pic TEXT;
+
 -- Enable RLS on Profiles
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
@@ -54,7 +61,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'spaces' AND policyname = 'Users can view their own spaces') THEN
     CREATE POLICY "Users can view their own spaces" ON public.spaces
       FOR SELECT USING (auth.uid() = user_id);
-  END If;
+  END IF;
   
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'spaces' AND policyname = 'Users can manage their own spaces') THEN
     CREATE POLICY "Users can manage their own spaces" ON public.spaces
@@ -221,16 +228,37 @@ $$;
 -- 8. Trigger Function: Automatically create public profile on new sign up
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  username_val TEXT;
+  display_name_val TEXT;
 BEGIN
+  -- Extract email prefix as fallback
+  username_val := COALESCE(split_part(new.email, '@', 1), 'user_' || substr(md5(random()::text), 1, 8));
+  display_name_val := username_val;
+
+  -- Extract metadata if present
+  IF new.raw_user_meta_data IS NOT NULL THEN
+    IF new.raw_user_meta_data ? 'username' THEN
+      username_val := COALESCE(new.raw_user_meta_data->>'username', username_val);
+    END IF;
+    IF new.raw_user_meta_data ? 'full_name' THEN
+      display_name_val := COALESCE(new.raw_user_meta_data->>'full_name', display_name_val);
+    END IF;
+  END IF;
+
   INSERT INTO public.profiles (id, username, display_name, workspace_title)
   VALUES (
     new.id,
-    COALESCE(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)),
-    COALESCE(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
+    username_val,
+    display_name_val,
     'MoonFerret Home'
   )
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Prevent trigger failure from blocking authentication signup
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
