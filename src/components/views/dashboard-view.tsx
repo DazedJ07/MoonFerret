@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import CoverflowCarousel, { type CarouselItem } from '@/components/carousel/coverflow-carousel';
 import { 
@@ -26,7 +26,9 @@ import AnimatedList from '@/components/dashboard/animated-list';
 import AddAssetModal from '@/components/modals/add-asset-modal';
 import AddStorageModal from '@/components/modals/add-storage-modal';
 import ItemDetailModal from '@/components/modals/item-detail-modal';
+import EditStorageModal from '@/components/modals/edit-storage-modal';
 import PillFilterNav from '@/components/pill-filter-nav';
+import type { ViewId } from '@/hooks/use-navigation';
 
 interface DashboardViewProps {
   spaces: Space[];
@@ -40,6 +42,7 @@ interface DashboardViewProps {
   onUpdateSpace: (id: string, updatedFields: Partial<Space>) => void;
   userId: string | null;
   userName: string;
+  onNavigateToSpace?: (spaceId: ViewId) => void;
 }
 
 const spaceImages: Record<string, string> = {
@@ -78,6 +81,7 @@ export default function DashboardView({
   onUpdateSpace,
   userId,
   userName,
+  onNavigateToSpace,
 }: DashboardViewProps) {
   const [selectedStorageId, setSelectedStorageId] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -88,6 +92,7 @@ export default function DashboardView({
 
   // Modals state
   const [isAddStorageOpen, setIsAddStorageOpen] = useState(false);
+  const [isEditStorageOpen, setIsEditStorageOpen] = useState(false);
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [isEditSpaceOpen, setIsEditSpaceOpen] = useState(false);
 
@@ -96,6 +101,8 @@ export default function DashboardView({
   const [editSpaceDesc, setEditSpaceDesc] = useState('');
   const [editSpaceDim, setEditSpaceDim] = useState('');
   const [editSpaceImage, setEditSpaceImage] = useState<string | null>(null);
+
+
 
   useEffect(() => {
     const idx = Math.floor(Math.random() * greetingTags.length);
@@ -139,12 +146,34 @@ export default function DashboardView({
   const activeSpaceId = isOverall ? null : activeSlide.id;
   const activeSelectedSpace = spaces.find(s => s.id === activeSpaceId);
 
+  const lastActiveSpaceIdRef = useRef<string | null>(null);
+
   // Reset selectedStorageId when space changes
   useEffect(() => {
-    setSelectedStorageId(null);
-    setSelectedItemId(null);
-    setActiveFilter('All');
+    // Only reset if it is not the initial mount and spaceId actually changed
+    if (lastActiveSpaceIdRef.current !== null && lastActiveSpaceIdRef.current !== activeSpaceId) {
+      setSelectedStorageId(null);
+      setSelectedItemId(null);
+      setActiveFilter('All');
+    }
+    lastActiveSpaceIdRef.current = activeSpaceId;
   }, [activeSpaceId]);
+
+  // Load and save active selectedStorageId to localStorage safely on client
+  useEffect(() => {
+    const savedStorageId = localStorage.getItem('moonferret-selected-storage-id');
+    if (savedStorageId && storageUnitsList.some(su => su.id === savedStorageId && (!activeSpaceId || su.spaceId === activeSpaceId))) {
+      setSelectedStorageId(savedStorageId);
+    }
+  }, [storageUnitsList, activeSpaceId]);
+
+  useEffect(() => {
+    if (selectedStorageId) {
+      localStorage.setItem('moonferret-selected-storage-id', selectedStorageId);
+    } else {
+      localStorage.removeItem('moonferret-selected-storage-id');
+    }
+  }, [selectedStorageId]);
 
   // Compute breadcrumbs path for hierarchical storages
   const storagePath = useMemo(() => {
@@ -398,6 +427,44 @@ export default function DashboardView({
     if (selectedStorageId && idsToDelete.includes(selectedStorageId)) {
       setSelectedStorageId(null);
       setSelectedItemId(null);
+    }
+  };
+
+  // CRUD: Edit Storage Unit details
+  const handleEditStorageSubmit = async (
+    id: string,
+    updatedFields: {
+      name: string;
+      type: StorageType;
+      capacity: number;
+      imageUrl: string | null;
+    }
+  ) => {
+    setStorageUnitsList(prev => prev.map(unit => {
+      if (unit.id === id) {
+        return {
+          ...unit,
+          name: updatedFields.name,
+          type: updatedFields.type,
+          capacity: updatedFields.capacity,
+          imageUrl: updatedFields.imageUrl || undefined,
+        };
+      }
+      return unit;
+    }));
+
+    if (userId) {
+      try {
+        const { error } = await supabase.from('storages').update({
+          name: updatedFields.name,
+          type: updatedFields.type,
+          capacity: updatedFields.capacity,
+          image_url: updatedFields.imageUrl
+        }).eq('id', id).eq('user_id', userId);
+        if (error) throw error;
+      } catch (err) {
+        console.error('Supabase edit storage fail:', err);
+      }
     }
   };
 
@@ -656,13 +723,19 @@ export default function DashboardView({
                       if (!isOverall) {
                         setSelectedStorageId(unit.id);
                         setSelectedItemId(null);
+                      } else {
+                        // Quick Link Navigation: go directly to the storage when clicked in Global Catalog
+                        if (unit.spaceId && unit.spaceId !== 'unassigned') {
+                          localStorage.setItem('moonferret-selected-storage-id', unit.id);
+                          onNavigateToSpace?.(unit.spaceId as ViewId);
+                        }
                       }
                     }}
-                    className={`text-left rounded-2xl border p-4.5 flex flex-col justify-between h-48 shadow-sm transition-all duration-300 hover:scale-[1.01] hover:shadow-md relative overflow-hidden group ${
+                    className={`text-left rounded-2xl border p-4.5 flex flex-col justify-between h-48 shadow-sm transition-all duration-300 hover:scale-[1.01] hover:shadow-md relative overflow-hidden group cursor-pointer ${
                       isSelected && !isOverall
                         ? 'border-brand bg-brand/5 ring-1 ring-brand/30'
                         : 'border-border-main/45 bg-card/65 backdrop-blur-md dark:bg-card/35'
-                    } ${isOverall ? 'cursor-default' : 'cursor-pointer'}`}
+                    }`}
                   >
                     {/* Explicit Delete Button */}
                     {!isOverall && (
@@ -735,6 +808,14 @@ export default function DashboardView({
                 <h4 className="text-xs font-bold text-primary">Stored Items: {activeSelectedStorage.name}</h4>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditStorageOpen(true)}
+                  className="h-7 px-3 bg-canvas border border-border-main/20 hover:bg-canvas/80 text-secondary rounded-full text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer font-sans"
+                >
+                  <Edit3 className="w-3 h-3 text-secondary" />
+                  Manage Storage
+                </button>
                 <button
                   onClick={() => setIsAddItemOpen(true)}
                   className="h-7 px-3 bg-brand/15 hover:bg-brand/25 text-brand rounded-full text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer font-sans"
@@ -908,6 +989,14 @@ export default function DashboardView({
         onClose={() => setSelectedItemId(null)}
         onDelete={handleDeleteItem}
         onQuantityAdjust={handleQuantityAdjust}
+      />
+
+      <EditStorageModal
+        isOpen={isEditStorageOpen}
+        onClose={() => setIsEditStorageOpen(false)}
+        storage={activeSelectedStorage}
+        onSave={handleEditStorageSubmit}
+        onDelete={handleDeleteStorage}
       />
 
       {/* Edit space modal */}

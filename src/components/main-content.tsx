@@ -678,6 +678,7 @@ export default function MainContent({
               onUpdateSpace={onUpdateSpace}
               userId={userId}
               userName={userName}
+              onNavigateToSpace={onNavigateToSpace}
             />
           )}
           {activeTab === 'my-items' ? null : (

@@ -109,26 +109,32 @@ export default function Home() {
 
   // Supabase Async Hydrator on Client Mount
   const fetchDashboardData = useCallback(async (activeUid: string) => {
+    // 1. Fetch Profile info from DB
     try {
-      // 1. Fetch Profile info from DB
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', activeUid)
         .maybeSingle();
       
+      if (error) throw error;
       if (profile) {
         setUserName(profile.display_name || profile.username || 'Jian M.');
         setWorkspaceTitle(profile.workspace_title || 'MoonFerret Home');
         setProfilePic(profile.avatar_url || profile.profile_pic || null);
       }
+    } catch (e) {
+      console.warn('Failed to load profile:', e);
+    }
 
-      // 2. Fetch Spaces from DB
-      const { data: spaces } = await supabase
+    // 2. Fetch Spaces from DB
+    try {
+      const { data: spaces, error } = await supabase
         .from('spaces')
         .select('*')
         .eq('user_id', activeUid);
 
+      if (error) throw error;
       setSpacesList(
         spaces
           ? spaces.map((s: any) => ({
@@ -143,13 +149,18 @@ export default function Home() {
             }))
           : []
       );
+    } catch (e) {
+      console.warn('Failed to load spaces:', e);
+    }
 
-      // 3. Fetch Storage Units from DB
-      const { data: storages } = await supabase
+    // 3. Fetch Storage Units from DB
+    try {
+      const { data: storages, error } = await supabase
         .from('storages')
         .select('*')
         .eq('user_id', activeUid);
 
+      if (error) throw error;
       setStorageUnitsList(
         storages
           ? storages.map((s: any) => ({
@@ -167,13 +178,18 @@ export default function Home() {
             }))
           : []
       );
+    } catch (e) {
+      console.warn('Failed to load storages:', e);
+    }
 
-      // 4. Fetch Individual Items from DB
-      const { data: items } = await supabase
+    // 4. Fetch Individual Items from DB
+    try {
+      const { data: items, error } = await supabase
         .from('items')
         .select('*')
         .eq('user_id', activeUid);
 
+      if (error) throw error;
       setIndividualItemsList(
         items
           ? items.map((i: any) => ({
@@ -195,13 +211,18 @@ export default function Home() {
             }))
           : []
       );
+    } catch (e) {
+      console.warn('Failed to load items:', e);
+    }
 
-      // 5. Fetch Notes from DB
-      const { data: notes } = await supabase
+    // 5. Fetch Notes from DB
+    try {
+      const { data: notes, error } = await supabase
         .from('notes')
         .select('*')
         .eq('user_id', activeUid);
 
+      if (error) throw error;
       setNotesList(
         notes
           ? notes.map((n: any) => ({
@@ -213,13 +234,37 @@ export default function Home() {
           : []
       );
     } catch (e) {
-      console.warn('Supabase hydration error (falling back to empty lists):', e);
+      console.warn('Failed to load notes:', e);
     }
   }, []);
+
+  // Save activeView and activeTab to localStorage on changes
+  useEffect(() => {
+    if (isMounted && activeView) {
+      localStorage.setItem('moonferret-active-view', activeView);
+    }
+  }, [activeView, isMounted]);
+
+  useEffect(() => {
+    if (isMounted && activeTab) {
+      localStorage.setItem('moonferret-active-tab', activeTab);
+    }
+  }, [activeTab, isMounted]);
 
   // established useEffect Auth Check
   useEffect(() => {
     if (!isMounted) return;
+
+    // Restore navigation details on client mount
+    const restoredView = localStorage.getItem('moonferret-active-view');
+    if (restoredView) {
+      navigate(restoredView as ViewId);
+    }
+
+    const restoredTab = localStorage.getItem('moonferret-active-tab');
+    if (restoredTab) {
+      switchTab(restoredTab as any);
+    }
 
     const initSession = async () => {
       try {
