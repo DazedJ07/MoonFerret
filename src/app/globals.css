@@ -42,6 +42,8 @@
   --color-primary: var(--text-primary);
   --color-secondary: var(--text-secondary);
   --color-border-main: var(--border-main);
+  --color-brand: var(--color-brand, #7ec8e3);
+  --color-brand-foreground: var(--color-brand-foreground, #ffffff);
 
   /* Aliases for background/foreground */
   --color-background: var(--bg-canvas);
@@ -104,4 +106,16 @@ body {
 /* Smooth scroll */
 html {
   scroll-behavior: smooth;
+}
+
+/* ───────────────────────────────────────────
+   UTILITY: Hide scrollbar (for horizontal pill navs)
+   ─────────────────────────────────────────── */
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

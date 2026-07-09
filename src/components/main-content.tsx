@@ -7,10 +7,12 @@ import {
   Shirt, ClipboardList, PenTool, Trash2, 
   CheckCircle2, Circle, Save, Tag, AlertCircle, History, X, Image as ImageIcon 
 } from 'lucide-react';
-import DashboardView, { type IndividualItem, type StorageUnit } from '@/components/views/dashboard-view';
-import type { Space } from '@/data/mock-data';
+import { Space, StorageUnit, IndividualItem, Outfit } from '@/data/types';
 import type { ViewId } from '@/hooks/use-navigation';
 import type { SubNavTab } from '@/hooks/use-sub-nav';
+import { supabase } from '@/lib/supabase';
+import OutfitBuilder from '@/components/modals/outfit-builder';
+import DashboardView from '@/components/views/dashboard-view';
 
 interface MainContentProps {
   activeView: ViewId;
@@ -42,112 +44,106 @@ interface MyOutfitsViewProps {
   setIndividualItemsList: React.Dispatch<React.SetStateAction<IndividualItem[]>>;
   storageUnitsList: StorageUnit[];
   setStorageUnitsList: React.Dispatch<React.SetStateAction<StorageUnit[]>>;
+  userId: string | null;
 }
 
 function MyOutfitsView({ 
   items, 
   setIndividualItemsList, 
   storageUnitsList, 
-  setStorageUnitsList 
+  setStorageUnitsList,
+  userId
 }: MyOutfitsViewProps) {
-  const [selectedItems, setSelectedItems] = useState<string[]>([]);
-  const [outfitName, setOutfitName] = useState('');
-  
-  const initialOutfits = [
-    { id: 'o-1', name: 'Smart Casual Autumn', items: ['Classic Blue Oxford Shirt', 'Charcoal Wool Trouser', 'Minimalist White Sneakers'] },
-    { id: 'o-2', name: 'Winter Layered Classic', items: ['Pure Cashmere Cream Sweater', 'Slim Fit Indigo Jeans', 'Over-sized Beige Trench Coat', 'Minimalist White Sneakers'] }
-  ];
-  const [outfits, setOutfits] = useState(initialOutfits);
+  const [outfits, setOutfits] = useState<Outfit[]>([]);
+  const [isBuilderOpen, setIsBuilderOpen] = useState(false);
 
-  // Quick Clothing add form modal states
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-  const [quickName, setQuickName] = useState('');
-  const [quickDesc, setQuickDesc] = useState('');
-  const [quickCond, setQuickCond] = useState<'Mint' | 'Good' | 'Worn'>('Good');
-  const [quickImage, setQuickImage] = useState<string | null>(null);
+  // Fetch outfits from Supabase
+  useEffect(() => {
+    if (!userId) return;
 
-  // Filter items that qualify as clothing/apparel (e.g. Shirts, Pants, Shoes, Sweaters, Coats)
-  const apparelItems = items.filter(item => 
-    item.imageUrl && (
-      item.name.toLowerCase().includes('shirt') ||
-      item.name.toLowerCase().includes('trouser') ||
-      item.name.toLowerCase().includes('sneakers') ||
-      item.name.toLowerCase().includes('coat') ||
-      item.name.toLowerCase().includes('jeans') ||
-      item.name.toLowerCase().includes('sweater') ||
-      item.name.toLowerCase().includes('shoes') ||
-      item.name.toLowerCase().includes('jacket')
-    )
-  );
+    const fetchOutfits = async () => {
+      try {
+        const { data: outfitsData, error: outfitsError } = await supabase
+          .from('outfits')
+          .select('id, name, image_url, created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
 
-  const toggleSelect = (name: string) => {
-    setSelectedItems(prev => 
-      prev.includes(name) ? prev.filter(i => i !== name) : [...prev, name]
-    );
-  };
+        if (outfitsError) throw outfitsError;
 
-  const handleCompile = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!outfitName.trim() || selectedItems.length === 0) return;
-    const newOutfit = {
-      id: `o-${Date.now()}`,
-      name: outfitName.trim(),
-      items: [...selectedItems]
+        const { data: itemsData, error: itemsError } = await supabase
+          .from('outfit_items')
+          .select('outfit_id, item_id');
+
+        if (itemsError) throw itemsError;
+
+        const compiledOutfits = (outfitsData || []).map((outfit) => {
+          const itemIds = (itemsData || [])
+            .filter((oi) => oi.outfit_id === outfit.id)
+            .map((oi) => oi.item_id);
+
+          return {
+            id: outfit.id,
+            name: outfit.name,
+            imageUrl: outfit.image_url || undefined,
+            itemIds,
+          };
+        });
+
+        setOutfits(compiledOutfits);
+      } catch (err) {
+        console.error('Error fetching outfits:', err);
+      }
     };
-    setOutfits(prev => [newOutfit, ...prev]);
-    setOutfitName('');
-    setSelectedItems([]);
-  };
 
-  const handleDelete = (id: string) => {
-    setOutfits(prev => prev.filter(o => o.id !== id));
-  };
+    fetchOutfits();
+  }, [userId]);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setQuickImage(url);
+  // CRUD: Save curating outfit
+  const handleSaveOutfit = async (outfitData: { name: string; itemIds: string[]; imageUrl?: string }) => {
+    const newOutfitId = crypto.randomUUID();
+    const newOutfit: Outfit = {
+      id: newOutfitId,
+      name: outfitData.name,
+      itemIds: outfitData.itemIds,
+      imageUrl: outfitData.imageUrl,
+    };
+
+    setOutfits((prev) => [newOutfit, ...prev]);
+
+    if (userId) {
+      try {
+        await supabase.from('outfits').insert({
+          id: newOutfitId,
+          name: outfitData.name,
+          image_url: outfitData.imageUrl || null,
+          user_id: userId,
+        });
+
+        const relationRows = outfitData.itemIds.map((itemId) => ({
+          outfit_id: newOutfitId,
+          item_id: itemId,
+        }));
+
+        await supabase.from('outfit_items').insert(relationRows);
+      } catch (err) {
+        console.error('Error saving outfit:', err);
+      }
     }
   };
 
-  const handleQuickAddSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickName.trim()) return;
+  // CRUD: Delete outfit
+  const handleDeleteOutfit = async (id: string) => {
+    setOutfits((prev) => prev.filter((o) => o.id !== id));
 
-    // Use Main Clothes Cabinet (su-1) as default storage container for quick wardrobe clothes
-    const newClothingItem: IndividualItem = {
-      id: `ii-${Date.now()}`,
-      containerId: 'su-1', 
-      name: quickName.trim(),
-      description: quickDesc.trim() || 'Fast track wardrobe item',
-      imageUrl: quickImage || 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=300&q=80',
-      quantity: 1,
-      condition: quickCond,
-      isSpare: false
-    };
-
-    setIndividualItemsList(prev => [...prev, newClothingItem]);
-    setSelectedItems(prev => [...prev, newClothingItem.name]);
-
-    // Update parent storage stats
-    setStorageUnitsList(prev => prev.map(unit => {
-      if (unit.id === 'su-1') {
-        const nextTotal = unit.totalItems + 1;
-        return {
-          ...unit,
-          totalItems: nextTotal,
-          status: nextTotal >= unit.capacity ? 'full' : nextTotal > 0 ? 'has-spares' : 'empty'
-        };
+    if (userId) {
+      try {
+        await supabase.from('outfits').delete().eq('id', id).eq('user_id', userId);
+        await supabase.from('outfit_items').delete().eq('outfit_id', id);
+      } catch (err) {
+        console.error('Error deleting outfit:', err);
       }
-      return unit;
-    }));
-
-    setQuickName('');
-    setQuickDesc('');
-    setQuickCond('Good');
-    setQuickImage(null);
-    setIsQuickAddOpen(false);
+    }
   };
 
   return (
@@ -155,251 +151,87 @@ function MyOutfitsView({
       <div className="flex items-center justify-between pb-1">
         <div>
           <h2 className="text-base font-bold text-primary">Outfit Builder</h2>
-          <p className="text-xs text-secondary">Construct custom clothing sets by selecting logged items</p>
+          <p className="text-xs text-secondary">Construct custom clothing sets by pairing logged items</p>
         </div>
         <button
-          onClick={() => setIsQuickAddOpen(true)}
-          className="h-8 px-3.5 bg-sky-500 hover:bg-sky-600 text-white rounded-full text-xs font-bold shadow-sm transition-all flex items-center gap-1"
+          onClick={() => setIsBuilderOpen(true)}
+          className="h-8 px-4 bg-brand text-brand-foreground rounded-full text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
         >
-          <Plus className="w-3.5 h-3.5" />
-          Add Clothes Shortcut
+          <Shirt className="w-3.5 h-3.5" />
+          Create Outfit
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* Left Column: Clothing Checklist Selection */}
-        <div className="md:col-span-2 bg-card rounded-2xl border border-border-main/40 p-5 space-y-4 shadow-sm">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-secondary flex items-center gap-2">
-            <Shirt className="w-3.5 h-3.5 text-sky-500" />
-            Clothing Wardrobe Checklist
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1">
-            {apparelItems.map((item) => {
-              const isChecked = selectedItems.includes(item.name);
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => toggleSelect(item.name)}
-                  className={`p-3 rounded-2xl border text-left flex items-center justify-between transition-all duration-300 hover:scale-[1.01] ${
-                    isChecked
-                      ? 'border-sky-400 bg-sky-500/5 shadow-sm'
-                      : 'border-border-main/30 bg-canvas/10 hover:bg-canvas/30'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-canvas overflow-hidden shrink-0 border border-border-main/20">
-                      {item.imageUrl && (
-                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-primary truncate">{item.name}</p>
-                      <p className="text-[9px] text-secondary mt-0.5 uppercase tracking-widest font-semibold">{item.condition}</p>
-                    </div>
-                  </div>
-                  <span className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
-                    isChecked ? 'border-sky-500 bg-sky-500 text-white' : 'border-border-main/40'
-                  }`}>
-                    {isChecked && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {outfits.map((outfit) => (
+          <div key={outfit.id} className="bg-card rounded-2xl border border-border-main/20 p-4.5 shadow-sm space-y-3 relative group overflow-hidden">
+            <button
+              onClick={() => handleDeleteOutfit(outfit.id)}
+              className="absolute top-4 right-4 z-20 p-1 bg-white hover:bg-rose-50 rounded-full border border-border-main/20 shadow-md text-stone-400 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+              aria-label="Delete outfit"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
 
-          {/* Outfit compilation form */}
-          <form onSubmit={handleCompile} className="pt-3 border-t border-border-main/30 space-y-3">
-            {/* Fine-grained modification tags display */}
-            {selectedItems.length > 0 && (
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold text-secondary uppercase tracking-wider block">Drafting Look Components:</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedItems.map((name) => (
-                    <span 
-                      key={name}
-                      className="inline-flex items-center gap-1.5 bg-sky-500/10 text-sky-600 border border-sky-400/20 px-3 py-1 rounded-full text-[10px] font-bold"
-                    >
-                      {name}
-                      <button 
-                        type="button" 
-                        onClick={() => toggleSelect(name)}
-                        className="hover:text-rose-500 text-sky-600/60 hover:text-rose-500 p-0.5 rounded-full transition-colors"
-                      >
-                        <X className="w-2.5 h-2.5" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
+            {/* Cover image if available */}
+            {outfit.imageUrl ? (
+              <div className="h-32 w-full rounded-xl overflow-hidden bg-canvas border border-border-main/10 relative z-0">
+                <img src={outfit.imageUrl} alt={outfit.name} className="w-full h-full object-cover" />
+              </div>
+            ) : (
+              <div className="h-32 w-full rounded-xl overflow-hidden bg-gradient-to-tr from-brand/20 to-brand/5 border border-border-main/10 flex items-center justify-center relative z-0">
+                <Shirt className="w-8 h-8 text-brand/30" />
               </div>
             )}
 
-            <div className="flex items-center gap-3">
-              <input
-                type="text"
-                placeholder="Name this look (e.g. Evening Out)..."
-                value={outfitName}
-                onChange={(e) => setOutfitName(e.target.value)}
-                className="flex-1 h-9 px-4 text-xs bg-canvas/30 rounded-full border border-border-main/40 focus:outline-none focus:bg-white focus:border-sky-300 font-medium"
-              />
-              <button
-                type="submit"
-                disabled={!outfitName.trim() || selectedItems.length === 0}
-                className="h-9 px-4 rounded-full bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Save Look
-              </button>
+            <div className="relative z-10 font-sans">
+              <h4 className="text-xs font-bold text-primary pr-6 truncate">{outfit.name}</h4>
+              <p className="text-[9px] text-secondary mt-0.5 uppercase tracking-wider font-semibold">
+                Custom Set
+              </p>
             </div>
-          </form>
-        </div>
 
-        {/* Right Column: Dynamic Outfits Cards with Overlapping stacked images */}
-        <div className="space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-secondary flex items-center gap-2">
-            <ClipboardList className="w-3.5 h-3.5 text-sky-500" />
-            Saved Outfits ({outfits.length})
-          </h3>
-          <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
-            {outfits.map((outfit) => (
-              <div key={outfit.id} className="bg-card rounded-2xl border border-border-main/40 p-4.5 shadow-sm space-y-3 relative group">
-                <button
-                  onClick={() => handleDelete(outfit.id)}
-                  className="absolute top-4 right-4 text-secondary/40 hover:text-rose-500 transition-colors"
-                  aria-label="Delete outfit"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-                <div>
-                  <h4 className="text-xs font-bold text-primary pr-6">{outfit.name}</h4>
-                  <p className="text-[9px] text-secondary mt-0.5 uppercase tracking-wider font-semibold">Custom Set</p>
+            {/* Overlapping dynamic stacked preview config */}
+            <div className="flex -space-x-3 overflow-hidden py-1">
+              {outfit.itemIds.slice(0, 5).map((itemId, idx) => {
+                const matchedItem = items.find((i) => i.id === itemId);
+                if (!matchedItem || !matchedItem.imageUrl) return null;
+                return (
+                  <div 
+                    key={idx} 
+                    className="w-8 h-8 rounded-full border-2 border-card overflow-hidden shrink-0 relative shadow-sm ring-1 ring-border-main/25"
+                    title={matchedItem.name}
+                  >
+                    <img 
+                      src={matchedItem.imageUrl} 
+                      alt={matchedItem.name} 
+                      className="w-full h-full object-cover" 
+                    />
+                  </div>
+                );
+              })}
+              {outfit.itemIds.length > 5 && (
+                <div className="w-8 h-8 rounded-full border-2 border-card bg-canvas flex items-center justify-center text-[9px] font-black text-secondary shrink-0 shadow-sm ring-1 ring-border-main/25 select-none font-mono">
+                  +{outfit.itemIds.length - 5}
                 </div>
-
-                {/* Overlapping dynamic stacked preview configuration */}
-                <div className="flex -space-x-3 overflow-hidden py-1">
-                  {outfit.items.map((itemName, idx) => {
-                    const matchedItem = items.find(i => i.name === itemName);
-                    if (!matchedItem || !matchedItem.imageUrl) return null;
-                    return (
-                      <div 
-                        key={idx} 
-                        className="w-10 h-10 rounded-full border-2 border-card overflow-hidden shrink-0 relative shadow-sm ring-1 ring-border-main/20"
-                      >
-                        <img 
-                          src={matchedItem.imageUrl} 
-                          alt={itemName} 
-                          className="w-full h-full object-cover" 
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+              )}
+            </div>
           </div>
-        </div>
-      </div>
+        ))}
 
-      {/* Quick Add Clothing Modal */}
-      <AnimatePresence>
-        {isQuickAddOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
-              className="absolute inset-0 bg-black/40 backdrop-blur-xs"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsQuickAddOpen(false)}
-            />
-            <motion.div 
-              className="relative w-full max-w-md bg-card rounded-3xl border border-border-main/40 p-6 shadow-2xl z-10 space-y-4"
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-border-main/20">
-                <h3 className="text-sm font-bold text-primary">Quick Add Wardrobe Apparel</h3>
-                <button onClick={() => setIsQuickAddOpen(false)} className="p-1 hover:bg-canvas rounded-full text-secondary">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleQuickAddSubmit} className="space-y-3.5 text-xs">
-                <div className="space-y-1">
-                  <label className="font-bold text-secondary">Apparel Item Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={quickName}
-                    onChange={(e) => setQuickName(e.target.value)}
-                    placeholder="e.g. Pure Cashmere Cream Sweater..."
-                    className="w-full h-9 px-3 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-sky-300 font-medium"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-bold text-secondary">Description / Details</label>
-                  <input
-                    type="text"
-                    value={quickDesc}
-                    onChange={(e) => setQuickDesc(e.target.value)}
-                    placeholder="e.g. Cream knit, luxury cashmere fiber..."
-                    className="w-full h-9 px-3 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="font-bold text-secondary">Condition Rating</label>
-                    <select
-                      value={quickCond}
-                      onChange={(e) => setQuickCond(e.target.value as any)}
-                      className="w-full h-9 px-3 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white font-medium"
-                    >
-                      <option value="Mint">Mint / New</option>
-                      <option value="Good">Good / Used</option>
-                      <option value="Worn">Worn / Mending</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="font-bold text-secondary">Apparel Thumbnail Picture</label>
-                    <div className="relative h-9">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageChange}
-                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
-                      />
-                      <div className="absolute inset-0 bg-canvas/30 rounded-xl border border-border-main/40 flex items-center justify-center gap-1.5 hover:bg-canvas/50">
-                        <ImageIcon className="w-3.5 h-3.5 text-secondary" />
-                        <span className="text-[10px] text-secondary font-medium">
-                          {quickImage ? 'Selected ✅' : 'Choose File'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-border-main/20 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsQuickAddOpen(false)}
-                    className="h-8.5 px-4 rounded-full bg-canvas text-secondary font-bold hover:bg-canvas/80"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="h-8.5 px-4 rounded-full bg-sky-500 text-white font-bold hover:bg-sky-600 shadow-sm"
-                  >
-                    Add Clothing Item
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+        {outfits.length === 0 && (
+          <div className="col-span-full py-16 text-center text-secondary text-xs bg-canvas/30 rounded-2xl border border-dashed border-border-main/20">
+            No curated looks saved yet. Click 'Create Outfit' to design one!
           </div>
         )}
-      </AnimatePresence>
+      </div>
+
+      <OutfitBuilder 
+        isOpen={isBuilderOpen}
+        onClose={() => setIsBuilderOpen(false)}
+        onSave={handleSaveOutfit}
+        allItems={items}
+      />
     </div>
   );
 }
@@ -809,6 +641,7 @@ export default function MainContent({
                   setIndividualItemsList={setIndividualItemsList}
                   storageUnitsList={storageUnitsList}
                   setStorageUnitsList={setStorageUnitsList}
+                  userId={userId}
                 />
               )}
               {activeTab === 'my-notes' && <MyNotesView notes={notesList} setNotes={setNotesList} />}

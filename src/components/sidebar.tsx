@@ -2,7 +2,7 @@
 
 import { BedDouble, CookingPot, Bath, Sofa, Plus, Trash2, Folder, LayoutDashboard } from 'lucide-react';
 import type { ViewId } from '@/hooks/use-navigation';
-import type { Space } from '@/data/mock-data';
+import type { Space } from '@/data/types';
 
 interface SidebarProps {
   activeView: ViewId;
@@ -33,7 +33,7 @@ export default function Sidebar({
   className
 }: SidebarProps) {
   return (
-    <aside className={className || "w-[240px] shrink-0 hidden lg:block"}>
+    <aside className={className || "w-full min-w-0 hidden lg:block"}>
       <div className="lg:sticky lg:top-24 bg-card rounded-2xl border border-border-main/40 p-4 space-y-3 shadow-[0_4px_20px_rgba(0,0,0,0.02)] transition-all duration-300 hover:shadow-[0_4px_30px_rgba(0,0,0,0.04)]">
         {/* Brand */}
         <div className="px-3 pt-1 pb-2">

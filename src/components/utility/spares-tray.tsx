@@ -2,7 +2,7 @@
 
 import { PackagePlus } from 'lucide-react';
 import AnimatedList from '@/components/reactbits/AnimatedList';
-import type { IndividualItem } from '@/components/views/dashboard-view';
+import type { IndividualItem } from '@/data/types';
 
 interface SparesTrayProps {
   spareItems: IndividualItem[];

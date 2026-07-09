@@ -1,38 +1,32 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import CoverflowCarousel, { type CarouselItem } from '@/components/carousel/coverflow-carousel';
-import type { Space } from '@/data/mock-data';
+import { 
+  Space, 
+  StorageUnit, 
+  IndividualItem, 
+  CategoryFilter, 
+  ItemCondition, 
+  StorageType,
+  buildStorageTree,
+  getDescendantIds,
+  buildChildStorageUnits,
+  computeStorageStatus,
+} from '@/data/types';
 import { 
   Package, Archive, AlertTriangle, ChevronRight, 
-  Plus, Minus, Tag, Image as ImageIcon, X, Sliders, Info, Trash2, Edit3 
+  Plus, Minus, Tag, Image as ImageIcon, X, Sliders, Info, Trash2, Edit3, ChevronLeft
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import AnimatedList from '@/components/dashboard/animated-list';
 
-export interface IndividualItem {
-  id: string;
-  containerId: string; // Reference to StorageUnit id
-  name: string;
-  description: string;
-  imageUrl?: string;
-  quantity: number;
-  condition: 'Mint' | 'Good' | 'Worn';
-  isSpare: boolean;
-}
-
-export interface StorageUnit {
-  id: string;
-  name: string;
-  spaceId: string;
-  spaceName: string;
-  totalItems: number;
-  capacity: number;
-  status: 'full' | 'has-spares' | 'empty';
-  imageUrl?: string;
-  compartments?: number;
-  type?: string;
-}
+// Import newly extracted modal components
+import AddAssetModal from '@/components/modals/add-asset-modal';
+import AddStorageModal from '@/components/modals/add-storage-modal';
+import ItemDetailModal from '@/components/modals/item-detail-modal';
+import PillFilterNav from '@/components/pill-filter-nav';
 
 interface DashboardViewProps {
   spaces: Space[];
@@ -87,9 +81,21 @@ export default function DashboardView({
 }: DashboardViewProps) {
   const [selectedStorageId, setSelectedStorageId] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<CategoryFilter>('All');
 
   // Animated greetings
   const [randomGreetingTag, setRandomGreetingTag] = useState('');
+
+  // Modals state
+  const [isAddStorageOpen, setIsAddStorageOpen] = useState(false);
+  const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+  const [isEditSpaceOpen, setIsEditSpaceOpen] = useState(false);
+
+  // Form states: Edit/Customize Space
+  const [editSpaceName, setEditSpaceName] = useState('');
+  const [editSpaceDesc, setEditSpaceDesc] = useState('');
+  const [editSpaceDim, setEditSpaceDim] = useState('');
+  const [editSpaceImage, setEditSpaceImage] = useState<string | null>(null);
 
   useEffect(() => {
     const idx = Math.floor(Math.random() * greetingTags.length);
@@ -107,32 +113,6 @@ export default function DashboardView({
     return `${text}, ${userName}! ✨`;
   };
 
-  // Modals state
-  const [isAddStorageOpen, setIsAddStorageOpen] = useState(false);
-  const [isAddItemOpen, setIsAddItemOpen] = useState(false);
-  const [isEditSpaceOpen, setIsEditSpaceOpen] = useState(false);
-
-  // Form states: Edit/Customize Space
-  const [editSpaceName, setEditSpaceName] = useState('');
-  const [editSpaceDesc, setEditSpaceDesc] = useState('');
-  const [editSpaceDim, setEditSpaceDim] = useState('');
-  const [editSpaceImage, setEditSpaceImage] = useState<string | null>(null);
-
-  // Form states: Add Storage
-  const [newStorageName, setNewStorageName] = useState('');
-  const [newStorageDesc, setNewStorageDesc] = useState('');
-  const [newStorageComp, setNewStorageComp] = useState(4);
-  const [newStorageType, setNewStorageType] = useState('Closet');
-  const [newStorageImage, setNewStorageImage] = useState<string | null>(null);
-
-  // Form states: Add Item
-  const [newItemName, setNewItemName] = useState('');
-  const [newItemDesc, setNewItemDesc] = useState('');
-  const [newItemQty, setNewItemQty] = useState(1);
-  const [newItemCond, setNewItemCond] = useState<'Mint' | 'Good' | 'Worn'>('Good');
-  const [newItemSpare, setNewItemSpare] = useState(false);
-  const [newItemImage, setNewItemImage] = useState<string | null>(null);
-
   // Build carousel spaces list
   const carouselItems: CarouselItem[] = [
     {
@@ -148,7 +128,7 @@ export default function DashboardView({
       subtitle: s.description,
       imageUrl: s.imageUrl || spaceImages[s.id],
       gradient: defaultSpaceGradients[idx % defaultSpaceGradients.length],
-      meta: `${storageUnitsList.filter((u) => u.spaceId === s.id).length} Storage Units`,
+      meta: `${storageUnitsList.filter((u) => u.spaceId === s.id && u.parentId === null).length} Storages`,
     })),
   ];
 
@@ -159,77 +139,150 @@ export default function DashboardView({
   const activeSpaceId = isOverall ? null : activeSlide.id;
   const activeSelectedSpace = spaces.find(s => s.id === activeSpaceId);
 
-  // Filter storages based on active space slide and Search Query
-  const activeStorages = (activeSpaceId
-    ? storageUnitsList.filter((unit) => unit.spaceId === activeSpaceId)
-    : storageUnitsList
-  ).filter(unit => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    
-    // Multi-field matching query logic
-    const matchUnitName = unit.name.toLowerCase().includes(query);
-    const matchUnitType = (unit.type || '').toLowerCase().includes(query);
-    const matchSpaceName = unit.spaceName.toLowerCase().includes(query);
-    
-    const matchItems = individualItemsList.some(item => 
-      item.containerId === unit.id && (
-        item.name.toLowerCase().includes(query) || 
-        (item.description || '').toLowerCase().includes(query) ||
-        item.condition.toLowerCase().includes(query)
-      )
-    );
-    
-    return matchUnitName || matchUnitType || matchSpaceName || matchItems;
-  });
+  // Reset selectedStorageId when space changes
+  useEffect(() => {
+    setSelectedStorageId(null);
+    setSelectedItemId(null);
+    setActiveFilter('All');
+  }, [activeSpaceId]);
 
-  // Fallback selected storage unit
-  const currentSelectedStorageId = selectedStorageId && activeStorages.some(u => u.id === selectedStorageId)
-    ? selectedStorageId
-    : activeStorages[0]?.id || null;
-
-  // Filter individual items stored strictly inside the active clicked storage unit and Search Query
-  const activeItems = (currentSelectedStorageId
-    ? individualItemsList.filter((item) => item.containerId === currentSelectedStorageId)
-    : []
-  ).filter(item => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return item.name.toLowerCase().includes(query) || 
-           (item.description || '').toLowerCase().includes(query) ||
-           item.condition.toLowerCase().includes(query);
-  });
-
-  // Localized calculations for stats
-  const activeSpaceContainers = activeSpaceId
-    ? individualItemsList.filter((item) => {
-        const parentStorage = storageUnitsList.find(su => su.id === item.containerId);
-        return parentStorage && parentStorage.spaceId === activeSpaceId;
-      })
-    : individualItemsList;
-
-  const totalItemsCount = activeSpaceContainers.reduce((sum, item) => sum + item.quantity, 0);
-  const totalStorageCount = activeStorages.length;
-
-  const lowStockCount = activeSpaceContainers.filter(
-    (item) => item.quantity > 0 && item.quantity <= 3
-  ).length;
-
-  const sparesCount = activeSpaceContainers.filter((item) => item.isSpare).length;
-
-  const activeSelectedStorage = storageUnitsList.find(su => su.id === currentSelectedStorageId);
-  const activeSelectedItem = individualItemsList.find(i => i.id === selectedItemId);
-
-  // Handlers for dynamic creations
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, setImgState: (url: string | null) => void) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const localUrl = URL.createObjectURL(file);
-      setImgState(localUrl);
+  // Compute breadcrumbs path for hierarchical storages
+  const storagePath = useMemo(() => {
+    const path: StorageUnit[] = [];
+    let currentId = selectedStorageId;
+    while (currentId) {
+      const unit = storageUnitsList.find(u => u.id === currentId);
+      if (unit) {
+        path.unshift(unit);
+        currentId = unit.parentId;
+      } else {
+        break;
+      }
     }
-  };
+    return path;
+  }, [storageUnitsList, selectedStorageId]);
 
-  // CRUD: Space Customization Edit Modal trigger
+  // Filter storages to render in grid based on space and current depth
+  const activeStorages = useMemo(() => {
+    // 1. Filter by space
+    let list = activeSpaceId
+      ? storageUnitsList.filter((unit) => unit.spaceId === activeSpaceId)
+      : storageUnitsList;
+
+    // 2. Filter by parent ID (depth)
+    if (!isOverall) {
+      list = list.filter(unit => unit.parentId === selectedStorageId);
+    } else {
+      // On global dashboard show only top-level units
+      list = list.filter(unit => unit.parentId === null);
+    }
+
+    // 3. Search query filter
+    return list.filter(unit => {
+      if (!searchQuery) return true;
+      const query = searchQuery.toLowerCase();
+      
+      const matchUnitName = unit.name.toLowerCase().includes(query);
+      const matchUnitType = (unit.type || '').toLowerCase().includes(query);
+      const matchSpaceName = unit.spaceName.toLowerCase().includes(query);
+      
+      const matchItems = individualItemsList.some(item => 
+        item.containerId === unit.id && (
+          item.name.toLowerCase().includes(query) || 
+          (item.description || '').toLowerCase().includes(query) ||
+          item.condition.toLowerCase().includes(query)
+        )
+      );
+      
+      return matchUnitName || matchUnitType || matchSpaceName || matchItems;
+    });
+  }, [storageUnitsList, activeSpaceId, selectedStorageId, searchQuery, individualItemsList, isOverall]);
+
+  // Fallback for drill-down catalog selection
+  const activeSelectedStorage = useMemo(() => {
+    return storageUnitsList.find(su => su.id === selectedStorageId) || null;
+  }, [storageUnitsList, selectedStorageId]);
+
+  // Filter individual items stored inside the active target storage unit and search query + category filters
+  const activeItems = useMemo(() => {
+    if (!selectedStorageId) return [];
+
+    return individualItemsList.filter(item => {
+      // Must be inside the selected storage unit
+      if (item.containerId !== selectedStorageId) return false;
+
+      // Search Query filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesSearch = item.name.toLowerCase().includes(query) || 
+          (item.description || '').toLowerCase().includes(query) ||
+          item.condition.toLowerCase().includes(query);
+        if (!matchesSearch) return false;
+      }
+
+      // Category filter
+      if (activeFilter === 'All') return true;
+      if (item.itemType === 'clothing') {
+        return item.category === activeFilter;
+      }
+      if (item.itemType === 'item-accessory' && activeFilter === 'Accessories') {
+        return true;
+      }
+      return false;
+    });
+  }, [individualItemsList, selectedStorageId, searchQuery, activeFilter]);
+
+  // Compute category count mapping for filter badges
+  const categoryCounts = useMemo(() => {
+    const counts: Partial<Record<CategoryFilter, number>> = { All: 0 };
+    if (!selectedStorageId) return counts;
+
+    const itemsInStorage = individualItemsList.filter(item => item.containerId === selectedStorageId);
+    counts.All = itemsInStorage.length;
+
+    itemsInStorage.forEach(item => {
+      if (item.itemType === 'clothing' && item.category) {
+        counts[item.category] = (counts[item.category] || 0) + 1;
+      } else if (item.itemType === 'item-accessory') {
+        counts.Accessories = (counts.Accessories || 0) + 1;
+      }
+    });
+
+    return counts;
+  }, [individualItemsList, selectedStorageId]);
+
+  // Scoped metrics summary
+  const activeSpaceContainers = useMemo(() => {
+    if (!activeSpaceId) return individualItemsList;
+    return individualItemsList.filter((item) => {
+      const parentStorage = storageUnitsList.find(su => su.id === item.containerId);
+      return parentStorage && parentStorage.spaceId === activeSpaceId;
+    });
+  }, [individualItemsList, storageUnitsList, activeSpaceId]);
+
+  const totalItemsCount = useMemo(() => {
+    return activeSpaceContainers.reduce((sum, item) => sum + item.quantity, 0);
+  }, [activeSpaceContainers]);
+
+  const totalStorageCount = useMemo(() => {
+    return activeSpaceId 
+      ? storageUnitsList.filter(su => su.spaceId === activeSpaceId).length
+      : storageUnitsList.length;
+  }, [storageUnitsList, activeSpaceId]);
+
+  const lowStockCount = useMemo(() => {
+    return activeSpaceContainers.filter(item => item.quantity > 0 && item.quantity <= 3).length;
+  }, [activeSpaceContainers]);
+
+  const sparesCount = useMemo(() => {
+    return activeSpaceContainers.filter(item => item.isSpare).length;
+  }, [activeSpaceContainers]);
+
+  const activeSelectedItem = useMemo(() => {
+    return individualItemsList.find(i => i.id === selectedItemId) || null;
+  }, [individualItemsList, selectedItemId]);
+
+  // Space Customization Modal triggers
   const handleOpenCustomize = () => {
     if (activeSelectedSpace) {
       setEditSpaceName(activeSelectedSpace.name);
@@ -253,28 +306,153 @@ export default function DashboardView({
     setIsEditSpaceOpen(false);
   };
 
-  // CRUD: Delete Storage Unit (Supabase anchor mapping user_id)
-  const handleDeleteStorage = async (id: string) => {
-    setStorageUnitsList(prev => prev.filter(u => u.id !== id));
-    setIndividualItemsList(prev => prev.filter(item => item.containerId !== id));
+  // CRUD: Add Storage Unit (+ auto-generated child containers/compartments)
+  const handleAddStorageSubmit = async (storageData: {
+    name: string;
+    type: string;
+    parentId: string | null;
+    compartments: number;
+    capacity: number;
+    imageUrl: string | null;
+  }) => {
+    if (!activeSpaceId) return;
+
+    const matchedSpace = spaces.find(s => s.id === activeSpaceId);
+    const parentId = `su-${Date.now()}`;
+    const newStorage: StorageUnit = {
+      id: parentId,
+      name: storageData.name,
+      spaceId: activeSpaceId,
+      spaceName: matchedSpace?.name || 'Custom Space',
+      parentId: storageData.parentId,
+      totalItems: 0,
+      capacity: storageData.capacity,
+      status: 'empty',
+      imageUrl: storageData.imageUrl || undefined,
+      compartments: storageData.compartments,
+      type: storageData.type as StorageType,
+    };
+
+    const childDrafts = buildChildStorageUnits(
+      newStorage,
+      newStorage.type as StorageType,
+      storageData.parentId,
+      storageData.compartments
+    );
+
+    const childUnits: StorageUnit[] = childDrafts.map((draft, i) => ({
+      ...draft,
+      id: `${parentId}-c${i + 1}`,
+    }));
+
+    const allUnits = [newStorage, ...childUnits];
+    setStorageUnitsList(prev => [...prev, ...allUnits]);
 
     if (userId) {
       try {
-        await supabase.from('storages').delete().eq('id', id).eq('user_id', userId);
-        // Cascades to delete nested items inside DB
-        await supabase.from('items').delete().eq('container_id', id).eq('user_id', userId);
+        await supabase.from('storages').insert(
+          allUnits.map((unit) => ({
+            id: unit.id,
+            name: unit.name,
+            space_id: unit.spaceId,
+            space_name: unit.spaceName,
+            parent_id: unit.parentId,
+            total_items: unit.totalItems,
+            capacity: unit.capacity,
+            status: unit.status,
+            image_url: unit.imageUrl || null,
+            compartments: unit.compartments ?? null,
+            type: unit.type,
+            user_id: userId,
+          }))
+        );
+      } catch (err) {
+        console.error('Supabase insert storage fail:', err);
+      }
+    }
+  };
+
+  // CRUD: Delete Storage Unit (deletes recursive tree children)
+  const handleDeleteStorage = async (id: string) => {
+    const idsToDelete = [id, ...getDescendantIds(id, storageUnitsList)];
+    
+    // Filter storage list and items list locally
+    setStorageUnitsList(prev => prev.filter(u => !idsToDelete.includes(u.id)));
+    setIndividualItemsList(prev => prev.filter(item => !idsToDelete.includes(item.containerId)));
+
+    if (userId) {
+      try {
+        await supabase.from('storages').delete().in('id', idsToDelete).eq('user_id', userId);
+        await supabase.from('items').delete().in('container_id', idsToDelete).eq('user_id', userId);
       } catch (err) {
         console.error('Supabase delete storage fail:', err);
       }
     }
 
-    if (selectedStorageId === id) {
+    if (selectedStorageId && idsToDelete.includes(selectedStorageId)) {
       setSelectedStorageId(null);
       setSelectedItemId(null);
     }
   };
 
-  // CRUD: Delete Individual Item (Supabase anchor mapping user_id)
+  // CRUD: Add Individual Item
+  const handleAddItemSubmit = async (itemData: Omit<IndividualItem, 'id'>) => {
+    const newItem: IndividualItem = {
+      id: `ii-${Date.now()}`,
+      ...itemData
+    };
+
+    setIndividualItemsList(prev => [...prev, newItem]);
+    
+    // Update container totalItems count in storage state
+    setStorageUnitsList(prev => prev.map(unit => {
+      if (unit.id === newItem.containerId) {
+        const nextTotal = unit.totalItems + newItem.quantity;
+        return {
+          ...unit,
+          totalItems: nextTotal,
+          status: nextTotal >= unit.capacity ? 'full' : nextTotal > 0 ? 'has-spares' : 'empty'
+        };
+      }
+      return unit;
+    }));
+
+    if (userId) {
+      try {
+        await supabase.from('items').insert({
+          id: newItem.id,
+          container_id: newItem.containerId,
+          name: newItem.name,
+          description: newItem.description,
+          image_url: newItem.imageUrl || null,
+          quantity: newItem.quantity,
+          condition: newItem.condition,
+          is_spare: newItem.isSpare,
+          item_type: newItem.itemType,
+          category: newItem.category || null,
+          sub_category: newItem.subCategory || null,
+          size: newItem.size || null,
+          color: newItem.color || null,
+          material: newItem.material || null,
+          brand: newItem.brand || null,
+          user_id: userId
+        });
+
+        const parentStorage = storageUnitsList.find(su => su.id === newItem.containerId);
+        if (parentStorage) {
+          const nextTotal = parentStorage.totalItems + newItem.quantity;
+          await supabase.from('storages').update({
+            total_items: nextTotal,
+            status: nextTotal >= parentStorage.capacity ? 'full' : nextTotal > 0 ? 'has-spares' : 'empty'
+          }).eq('id', newItem.containerId).eq('user_id', userId);
+        }
+      } catch (err) {
+        console.error('Supabase insert item fail:', err);
+      }
+    }
+  };
+
+  // CRUD: Delete Individual Item
   const handleDeleteItem = async (itemId: string) => {
     const itemToDelete = individualItemsList.find(i => i.id === itemId);
     if (!itemToDelete) return;
@@ -297,11 +475,12 @@ export default function DashboardView({
     if (userId) {
       try {
         await supabase.from('items').delete().eq('id', itemId).eq('user_id', userId);
-        if (activeSelectedStorage) {
-          const nextTotal = Math.max(0, activeSelectedStorage.totalItems - itemToDelete.quantity);
+        const parentStorage = storageUnitsList.find(su => su.id === itemToDelete.containerId);
+        if (parentStorage) {
+          const nextTotal = Math.max(0, parentStorage.totalItems - itemToDelete.quantity);
           await supabase.from('storages').update({
             total_items: nextTotal,
-            status: nextTotal >= activeSelectedStorage.capacity ? 'full' : nextTotal > 0 ? 'has-spares' : 'empty'
+            status: nextTotal >= parentStorage.capacity ? 'full' : nextTotal > 0 ? 'has-spares' : 'empty'
           }).eq('id', itemToDelete.containerId).eq('user_id', userId);
         }
       } catch (err) {
@@ -310,116 +489,7 @@ export default function DashboardView({
     }
   };
 
-  const handleAddStorageSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newStorageName.trim() || !activeSpaceId) return;
-
-    const matchedSpace = spaces.find(s => s.id === activeSpaceId);
-    const newStorage: StorageUnit = {
-      id: `su-${Date.now()}`,
-      name: newStorageName.trim(),
-      spaceId: activeSpaceId,
-      spaceName: matchedSpace?.name || 'Custom Space',
-      totalItems: 0,
-      capacity: newStorageComp * 5,
-      status: 'empty',
-      imageUrl: newStorageImage || undefined,
-      compartments: newStorageComp,
-      type: newStorageType,
-    };
-
-    setStorageUnitsList(prev => [...prev, newStorage]);
-
-    if (userId) {
-      try {
-        await supabase.from('storages').insert({
-          id: newStorage.id,
-          name: newStorage.name,
-          space_id: newStorage.spaceId,
-          space_name: newStorage.spaceName,
-          total_items: newStorage.totalItems,
-          capacity: newStorage.capacity,
-          status: newStorage.status,
-          image_url: newStorage.imageUrl || null,
-          compartments: newStorage.compartments,
-          type: newStorage.type,
-          user_id: userId
-        });
-      } catch (err) {
-        console.error('Supabase insert storage fail:', err);
-      }
-    }
-
-    setNewStorageName('');
-    setNewStorageDesc('');
-    setNewStorageComp(4);
-    setNewStorageImage(null);
-    setIsAddStorageOpen(false);
-  };
-
-  const handleAddItemSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newItemName.trim() || !currentSelectedStorageId || !activeSelectedStorage) return;
-
-    const newItem: IndividualItem = {
-      id: `ii-${Date.now()}`,
-      containerId: currentSelectedStorageId,
-      name: newItemName.trim(),
-      description: newItemDesc.trim(),
-      imageUrl: newItemImage || undefined,
-      quantity: newItemQty,
-      condition: newItemCond,
-      isSpare: newItemSpare,
-    };
-
-    setIndividualItemsList(prev => [...prev, newItem]);
-    
-    // Update container totalItems count in storage state
-    setStorageUnitsList(prev => prev.map(unit => {
-      if (unit.id === currentSelectedStorageId) {
-        const nextTotal = unit.totalItems + newItemQty;
-        return {
-          ...unit,
-          totalItems: nextTotal,
-          status: nextTotal >= unit.capacity ? 'full' : nextTotal > 0 ? 'has-spares' : 'empty'
-        };
-      }
-      return unit;
-    }));
-
-    if (userId) {
-      try {
-        await supabase.from('items').insert({
-          id: newItem.id,
-          container_id: newItem.containerId,
-          name: newItem.name,
-          description: newItem.description,
-          image_url: newItem.imageUrl || null,
-          quantity: newItem.quantity,
-          condition: newItem.condition,
-          is_spare: newItem.isSpare,
-          user_id: userId
-        });
-
-        const nextTotal = activeSelectedStorage.totalItems + newItemQty;
-        await supabase.from('storages').update({
-          total_items: nextTotal,
-          status: nextTotal >= activeSelectedStorage.capacity ? 'full' : nextTotal > 0 ? 'has-spares' : 'empty'
-        }).eq('id', currentSelectedStorageId).eq('user_id', userId);
-      } catch (err) {
-        console.error('Supabase insert item fail:', err);
-      }
-    }
-
-    setNewItemName('');
-    setNewItemDesc('');
-    setNewItemQty(1);
-    setNewItemCond('Good');
-    setNewItemSpare(false);
-    setNewItemImage(null);
-    setIsAddItemOpen(false);
-  };
-
+  // CRUD: Quantity Stepper Adjuster
   const handleQuantityAdjust = async (itemId: string, direction: 'inc' | 'dec') => {
     const item = individualItemsList.find(i => i.id === itemId);
     if (!item) return;
@@ -433,7 +503,7 @@ export default function DashboardView({
       return i;
     }));
     
-    // Update capacity in parent storage locally
+    // Update parent storage locally
     setStorageUnitsList(prevSu => prevSu.map(unit => {
       if (unit.id === item.containerId) {
         const diff = nextQty - item.quantity;
@@ -449,9 +519,7 @@ export default function DashboardView({
 
     if (userId) {
       try {
-        await supabase.from('items').update({
-          quantity: nextQty
-        }).eq('id', itemId).eq('user_id', userId);
+        await supabase.from('items').update({ quantity: nextQty }).eq('id', itemId).eq('user_id', userId);
 
         if (parentStorage) {
           const diff = nextQty - item.quantity;
@@ -468,9 +536,9 @@ export default function DashboardView({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       {/* View Header */}
-      <div className="flex items-center justify-between pb-1">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-1">
         <div>
           {isOverall ? (
             <motion.h2 
@@ -500,7 +568,7 @@ export default function DashboardView({
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 sm:self-start">
           {!isOverall && (
             <button
               onClick={handleOpenCustomize}
@@ -516,7 +584,7 @@ export default function DashboardView({
         </div>
       </div>
 
-      {/* Looping Carousel centerpiece */}
+      {/* Coverflow Carousel */}
       <div className="w-full py-2 bg-canvas/40 rounded-3xl border border-border-main/20 p-2 shadow-inner">
         <CoverflowCarousel
           items={carouselItems}
@@ -528,17 +596,37 @@ export default function DashboardView({
 
       {/* Main bottom grid and drill down workflow */}
       <div className="space-y-6">
-        {/* Storage containers section */}
+        {/* Storage Catalog Section */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5 font-sans">
-              <Archive className="w-3.5 h-3.5 text-brand" />
-              {isOverall ? 'Global Storage Catalog' : 'Physical Storage grid'}
-            </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-secondary flex-wrap">
+              <Archive className="w-3.5 h-3.5 text-brand flex-shrink-0" />
+              <button 
+                onClick={() => setSelectedStorageId(null)}
+                className="text-xs font-bold uppercase tracking-wider hover:text-primary transition-colors cursor-pointer"
+              >
+                {isOverall ? 'Global Catalog' : 'Physical Catalog'}
+              </button>
+              {storagePath.map((node, i) => (
+                <div key={node.id} className="flex items-center gap-1.5 text-xs text-secondary font-bold">
+                  <ChevronRight className="w-3 h-3 text-stone-400" />
+                  <button 
+                    onClick={() => {
+                      setSelectedStorageId(node.id);
+                      setSelectedItemId(null);
+                    }}
+                    className="hover:text-primary transition-colors cursor-pointer"
+                  >
+                    {node.name}
+                  </button>
+                </div>
+              ))}
+            </div>
+            
             {!isOverall && (
               <button
                 onClick={() => setIsAddStorageOpen(true)}
-                className="h-7 px-3 bg-brand hover:brightness-95 text-brand-foreground rounded-full text-[10px] font-bold shadow-sm transition-all flex items-center gap-1 cursor-pointer font-sans"
+                className="h-7 px-3 bg-brand hover:brightness-95 text-brand-foreground rounded-full text-[10px] font-bold shadow-sm transition-all flex items-center gap-1 cursor-pointer font-sans self-start sm:self-auto"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add Storage
@@ -546,11 +634,11 @@ export default function DashboardView({
             )}
           </div>
 
-          {/* 1. Internal Grid Scrolling Constraint Wrapper */}
+          {/* Catalog grid */}
           <div className={`w-full ${activeStorages.length > 6 ? 'max-h-[520px] overflow-y-auto pr-2' : ''}`}>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {activeStorages.map((unit) => {
-                const isSelected = unit.id === currentSelectedStorageId;
+                const isSelected = unit.id === selectedStorageId;
                 const hasImg = !!unit.imageUrl;
 
                 return (
@@ -568,7 +656,7 @@ export default function DashboardView({
                         : 'border-border-main/45 bg-card'
                     } ${isOverall ? 'cursor-default' : 'cursor-pointer'}`}
                   >
-                    {/* Explicit Delete Button — visible ONLY on hover without overlapping badges */}
+                    {/* Explicit Delete Button */}
                     {!isOverall && (
                       <span
                         onClick={(e) => {
@@ -576,13 +664,13 @@ export default function DashboardView({
                           handleDeleteStorage(unit.id);
                         }}
                         className="absolute top-3 right-3 z-20 p-1.5 bg-white hover:bg-rose-50 rounded-full border border-border-main/30 shadow-md text-stone-400 hover:text-rose-500 transition-all duration-200 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 cursor-pointer"
-                        title="Delete Storage Unit"
+                        title="Delete Storage"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </span>
                     )}
 
-                    {/* Background container image preview */}
+                    {/* Background preview */}
                     {hasImg ? (
                       <div className="absolute inset-0 z-0">
                         <img src={unit.imageUrl} alt={unit.name} className="w-full h-full object-cover opacity-20" />
@@ -618,107 +706,136 @@ export default function DashboardView({
                   </button>
                 );
               })}
+
+              {activeStorages.length === 0 && (
+                <div className="col-span-full py-12 text-center text-secondary text-xs">
+                  {selectedStorageId 
+                    ? 'No child storage units / drawers defined here.' 
+                    : 'No storage containers cataloged in this space.'}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Dynamic Drill Down Capsule Items list */}
+        {/* Dynamic Drill Down Items list */}
         {!isOverall && activeSelectedStorage && (
           <div className="bg-card border border-border-main/40 rounded-2xl p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-border-main/20">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border-main/20">
               <div className="flex items-center gap-2">
                 <Sliders className="w-3.5 h-3.5 text-brand" />
                 <h4 className="text-xs font-bold text-primary">Stored Items: {activeSelectedStorage.name}</h4>
               </div>
-              <button
-                onClick={() => setIsAddItemOpen(true)}
-                className="h-7 px-3 bg-brand/15 hover:bg-brand/25 text-brand rounded-full text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer font-sans"
-              >
-                <Plus className="w-3 h-3 text-brand" />
-                Add Item
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsAddItemOpen(true)}
+                  className="h-7 px-3 bg-brand/15 hover:bg-brand/25 text-brand rounded-full text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer font-sans"
+                >
+                  <Plus className="w-3 h-3 text-brand" />
+                  Add Item
+                </button>
+              </div>
             </div>
 
-            {/* Compact list rows layout styled like image_933d20.png */}
-            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1.5">
-              {activeItems.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => setSelectedItemId(item.id)}
-                  className={`p-3 rounded-2xl border flex items-center justify-between gap-4 cursor-pointer transition-all duration-300 hover:scale-[1.01] ${
-                    selectedItemId === item.id 
-                      ? 'border-brand bg-brand/5' 
-                      : 'border-border-main/30 bg-card hover:bg-canvas/20'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-canvas overflow-hidden shrink-0 border border-border-main/20 relative">
-                      {item.imageUrl ? (
-                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-brand/10 text-brand font-bold text-xs">
-                          {item.name.charAt(0)}
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-primary truncate">{item.name}</p>
-                      <p className="text-[10px] text-secondary mt-0.5 truncate">{item.description || 'No description added'}</p>
-                    </div>
-                  </div>
+            {/* Category filter pills */}
+            <div className="flex justify-start">
+              <PillFilterNav 
+                activeFilter={activeFilter} 
+                onFilterChange={setActiveFilter} 
+                counts={categoryCounts} 
+              />
+            </div>
 
-                  {/* Quantity and parameters capsules */}
-                  <div className="flex items-center gap-3 shrink-0" onClick={e => e.stopPropagation()}>
-                    <span className="text-[9px] font-bold uppercase tracking-wider bg-canvas border border-border-main/20 px-2 py-0.5 rounded-full text-secondary font-semibold">
-                      {item.condition}
-                    </span>
-                    {item.isSpare && (
-                      <span className="text-[9px] font-bold uppercase tracking-wider bg-brand/10 text-brand border border-brand/25 px-2 py-0.5 rounded-full font-semibold">
-                        Spare
-                      </span>
-                    )}
-                    <div className="flex items-center gap-1 bg-canvas p-1 rounded-full border border-border-main/30">
+            {/* Items list wrapper */}
+            <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1.5">
+              <AnimatedList className="space-y-2">
+                {activeItems.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => setSelectedItemId(item.id)}
+                    className={`p-3 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-all duration-300 hover:scale-[1.01] ${
+                      selectedItemId === item.id 
+                        ? 'border-brand bg-brand/5' 
+                        : 'border-border-main/30 bg-card hover:bg-canvas/20'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-canvas overflow-hidden shrink-0 border border-border-main/20 relative">
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-brand/10 text-brand font-bold text-xs">
+                            {item.name.charAt(0)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-bold text-primary truncate">{item.name}</p>
+                          <span className="text-[8px] bg-brand/10 text-brand border border-brand/20 px-1.5 py-0.2 rounded font-extrabold uppercase tracking-wide">
+                            {item.itemType === 'clothing' ? item.category : 'Accessory'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-secondary mt-0.5 truncate">{item.description || 'No description added'}</p>
+                      </div>
+                    </div>
+
+                    {/* Adjusters and badges */}
+                    <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-bold uppercase tracking-wider bg-canvas border border-border-main/20 px-2 py-0.5 rounded-full text-secondary">
+                          {item.condition}
+                        </span>
+                        {item.isSpare && (
+                          <span className="text-[9px] font-bold uppercase tracking-wider bg-brand/10 text-brand border border-brand/25 px-2 py-0.5 rounded-full">
+                            Spare
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-1 bg-canvas p-1 rounded-full border border-border-main/30">
+                        <button
+                          onClick={() => handleQuantityAdjust(item.id, 'dec')}
+                          className="w-6 h-6 rounded-full bg-card hover:bg-canvas flex items-center justify-center shadow-sm border border-border-main/10 cursor-pointer"
+                        >
+                          <Minus className="w-2.5 h-2.5 text-secondary" />
+                        </button>
+                        <span className="w-6 text-center text-xs font-bold text-primary tabular-nums">
+                          {item.quantity}
+                        </span>
+                        <button
+                          onClick={() => handleQuantityAdjust(item.id, 'inc')}
+                          className="w-6 h-6 rounded-full bg-brand/10 hover:bg-brand/20 flex items-center justify-center shadow-sm border border-brand/20 cursor-pointer"
+                        >
+                          <Plus className="w-2.5 h-2.5 text-brand" />
+                        </button>
+                      </div>
+                      
                       <button
-                        onClick={() => handleQuantityAdjust(item.id, 'dec')}
-                        className="w-6 h-6 rounded-full bg-card hover:bg-canvas flex items-center justify-center shadow-sm border border-border-main/10 cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteItem(item.id);
+                        }}
+                        className="p-1 hover:bg-canvas rounded text-secondary/40 hover:text-rose-500 transition-colors cursor-pointer"
+                        title="Delete item"
                       >
-                        <Minus className="w-2.5 h-2.5 text-secondary" />
-                      </button>
-                      <span className="w-6 text-center text-xs font-bold text-primary tabular-nums">
-                        {item.quantity}
-                      </span>
-                      <button
-                        onClick={() => handleQuantityAdjust(item.id, 'inc')}
-                        className="w-6 h-6 rounded-full bg-brand/10 hover:bg-brand/20 flex items-center justify-center shadow-sm border border-brand/20 cursor-pointer"
-                      >
-                        <Plus className="w-2.5 h-2.5 text-brand" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    {/* Direct row delete button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteItem(item.id);
-                      }}
-                      className="p-1 hover:bg-canvas rounded text-secondary/40 hover:text-rose-500 transition-colors cursor-pointer"
-                      title="Delete item completely"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
                   </div>
-                </div>
-              ))}
+                ))}
+              </AnimatedList>
 
               {activeItems.length === 0 && (
                 <div className="text-center py-8">
-                  <p className="text-xs text-secondary font-medium">No matching items found inside this cabinet.</p>
+                  <p className="text-xs text-secondary font-medium">No inventory assets matched the active filter keys.</p>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* 5. Repositioned Reactive Stats Card at Very Bottom */}
+        {/* Scoped metrics stats summary */}
         <div className="bg-card rounded-2xl border border-border-main/40 p-5 shadow-sm space-y-4">
           <h3 className="text-xs font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5 pb-2 border-b border-border-main/20 font-sans">
             <Package className="w-3.5 h-3.5 text-brand" />
@@ -749,11 +866,34 @@ export default function DashboardView({
         </div>
       </div>
 
-      {/* ────────────────────────────────────────────────────────
-         MODALS & DRAWERS FOR DRILL DOWN AND CRUD
-         ──────────────────────────────────────────────────────── */}
+      {/* Extracted modular modals */}
+      <AddStorageModal 
+        isOpen={isAddStorageOpen}
+        onClose={() => setIsAddStorageOpen(false)}
+        onSubmit={handleAddStorageSubmit}
+        existingStorages={storageUnitsList}
+        activeSpaceId={activeSpaceId}
+        defaultParentId={selectedStorageId}
+      />
 
-      {/* Customize/Edit Space Modal Form */}
+      <AddAssetModal 
+        isOpen={isAddItemOpen}
+        onClose={() => setIsAddItemOpen(false)}
+        onSubmit={handleAddItemSubmit}
+        storageUnits={storageUnitsList}
+        activeSpaceId={activeSpaceId}
+        defaultContainerId={selectedStorageId}
+      />
+
+      <ItemDetailModal 
+        item={activeSelectedItem}
+        isOpen={!!selectedItemId}
+        onClose={() => setSelectedItemId(null)}
+        onDelete={handleDeleteItem}
+        onQuantityAdjust={handleQuantityAdjust}
+      />
+
+      {/* Edit space modal */}
       <AnimatePresence>
         {isEditSpaceOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -771,431 +911,59 @@ export default function DashboardView({
               exit={{ scale: 0.95, opacity: 0 }}
             >
               <div className="flex items-center justify-between pb-2 border-b border-border-main/20">
-                <h3 className="text-sm font-bold text-primary flex items-center gap-1.5">
-                  <Edit3 className="w-4 h-4 text-brand" />
-                  Customize Space Details
-                </h3>
+                <h3 className="text-sm font-bold text-primary">Customize Space</h3>
                 <button onClick={() => setIsEditSpaceOpen(false)} className="p-1 hover:bg-canvas rounded-full text-secondary">
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               <form onSubmit={handleSaveCustomizeSubmit} className="space-y-3.5 text-xs font-sans">
-                <div className="space-y-1">
-                  <label className="font-bold text-secondary">Space Name / Title</label>
-                  <input
-                    type="text"
+                <div className="space-y-1.5">
+                  <label className="font-bold text-secondary">Space Name</label>
+                  <input 
+                    type="text" 
                     required
-                    value={editSpaceName}
+                    value={editSpaceName} 
                     onChange={(e) => setEditSpaceName(e.target.value)}
-                    className="w-full h-9 px-3 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand font-medium"
+                    className="w-full h-9 px-3 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand font-medium text-sm"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="font-bold text-secondary">Description / Details</label>
-                  <input
-                    type="text"
-                    value={editSpaceDesc}
+                <div className="space-y-1.5">
+                  <label className="font-bold text-secondary">Description</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={editSpaceDesc} 
                     onChange={(e) => setEditSpaceDesc(e.target.value)}
-                    className="w-full h-9 px-3 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white"
+                    className="w-full h-9 px-3 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand font-medium text-sm"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="font-bold text-secondary">Size Dimensions</label>
-                    <input
-                      type="text"
-                      value={editSpaceDim}
-                      onChange={(e) => setEditSpaceDim(e.target.value)}
-                      placeholder="e.g. 14x12 ft"
-                      className="w-full h-9 px-3 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="font-bold text-secondary">Custom Space Image</label>
-                    <div className="relative h-9">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleImageChange(e, setEditSpaceImage)}
-                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
-                      />
-                      <div className="absolute inset-0 bg-canvas/30 rounded-xl border border-border-main/40 flex items-center justify-center gap-1.5 hover:bg-canvas/50">
-                        <ImageIcon className="w-3.5 h-3.5 text-secondary" />
-                        <span className="text-[10px] text-secondary font-medium">
-                          {editSpaceImage ? 'Selected ✅' : 'Upload custom picture'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                <div className="space-y-1.5">
+                  <label className="font-bold text-secondary">Dimensions (Size)</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. 12x15 ft or 180 sq ft"
+                    value={editSpaceDim} 
+                    onChange={(e) => setEditSpaceDim(e.target.value)}
+                    className="w-full h-9 px-3 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand font-medium text-sm"
+                  />
                 </div>
 
                 <div className="pt-3 border-t border-border-main/20 flex justify-end gap-2">
-                  <button
-                    type="button"
+                  <button 
+                    type="button" 
                     onClick={() => setIsEditSpaceOpen(false)}
                     className="h-8.5 px-4 rounded-full bg-canvas text-secondary font-bold hover:bg-canvas/80"
                   >
                     Cancel
                   </button>
-                  <button
-                    type="submit"
+                  <button 
+                    type="submit" 
                     className="h-8.5 px-4 rounded-full bg-brand text-brand-foreground font-bold hover:brightness-95 shadow-sm"
                   >
                     Save Changes
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Dynamic Item Preview Detail Pop-up Modal */}
-      <AnimatePresence>
-        {activeSelectedItem && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop */}
-            <motion.div 
-              className="absolute inset-0 bg-black/40 backdrop-blur-xs"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedItemId(null)}
-            />
-            {/* Center Modal Panel */}
-            <motion.div 
-              className="relative w-full max-w-sm bg-card rounded-3xl border border-border-main/40 p-6 shadow-2xl z-10 flex flex-col gap-4"
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-            >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-border-main/20">
-                  <span className="text-xs font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5">
-                    <Info className="w-4 h-4 text-brand" />
-                    Asset Details
-                  </span>
-                  <button onClick={() => setSelectedItemId(null)} className="p-1 hover:bg-canvas rounded-full text-secondary">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* Full-scale image preview — object-contain to avoid cropping */}
-                <div className="w-full h-48 bg-canvas rounded-2xl border border-border-main/20 relative shadow-inner flex items-center justify-center overflow-hidden">
-                  {activeSelectedItem.imageUrl ? (
-                    <img 
-                      src={activeSelectedItem.imageUrl} 
-                      alt={activeSelectedItem.name} 
-                      className="w-full h-full object-contain p-2" 
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-secondary/40 gap-1">
-                      <ImageIcon className="w-8 h-8" />
-                      <span className="text-[10px] font-medium">No Image Uploaded</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-3.5">
-                  <div>
-                    <h3 className="text-sm font-bold text-primary leading-snug">{activeSelectedItem.name}</h3>
-                    <p className="text-xs text-secondary mt-1 leading-relaxed">{activeSelectedItem.description || 'No description added yet.'}</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="p-2.5 bg-canvas/30 rounded-xl border border-border-main/20">
-                      <span className="text-[8px] text-secondary font-bold uppercase block mb-1">Condition</span>
-                      <span className="font-bold text-primary">{activeSelectedItem.condition}</span>
-                    </div>
-                    <div className="p-2.5 bg-canvas/30 rounded-xl border border-border-main/20">
-                      <span className="text-[8px] text-secondary font-bold uppercase block mb-1">Classification</span>
-                      <span className="font-bold text-brand">{activeSelectedItem.isSpare ? 'Spare Asset' : 'Standard Item'}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Actions */}
-              <div className="pt-3 border-t border-border-main/20 flex items-center justify-between">
-                <div className="flex items-center gap-1 bg-canvas p-1 rounded-full border border-border-main/30">
-                  <button
-                    onClick={() => handleQuantityAdjust(activeSelectedItem.id, 'dec')}
-                    className="w-7 h-7 rounded-full bg-card hover:bg-canvas flex items-center justify-center shadow-sm"
-                  >
-                    <Minus className="w-3 h-3 text-secondary" />
-                  </button>
-                  <span className="w-8 text-center text-xs font-bold text-primary tabular-nums">
-                    {activeSelectedItem.quantity}
-                  </span>
-                  <button
-                    onClick={() => handleQuantityAdjust(activeSelectedItem.id, 'inc')}
-                    className="w-7 h-7 rounded-full bg-brand/10 hover:bg-brand/20 flex items-center justify-center shadow-sm animate-pulse"
-                  >
-                    <Plus className="w-3 h-3 text-brand" />
-                  </button>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      handleDeleteItem(activeSelectedItem.id);
-                      setSelectedItemId(null);
-                    }}
-                    className="h-8.5 px-3 rounded-full bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 text-xs font-bold transition-all shadow-sm cursor-pointer"
-                  >
-                    Delete
-                  </button>
-                  <button
-                    onClick={() => setSelectedItemId(null)}
-                    className="h-8.5 px-4 rounded-full bg-primary text-white text-xs font-bold shadow-sm"
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Add Storage Modal Form */}
-      <AnimatePresence>
-        {isAddStorageOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
-              className="absolute inset-0 bg-black/40 backdrop-blur-xs"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsAddStorageOpen(false)}
-            />
-            <motion.div 
-              className="relative w-full max-w-md bg-card rounded-3xl border border-border-main/40 p-6 shadow-2xl z-10 space-y-4"
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-border-main/20">
-                <h3 className="text-sm font-bold text-primary">Add New Storage Container</h3>
-                <button onClick={() => setIsAddStorageOpen(false)} className="p-1 hover:bg-canvas rounded-full text-secondary">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleAddStorageSubmit} className="space-y-3.5 text-xs font-sans">
-                <div className="space-y-1">
-                  <label className="font-bold text-secondary">Storage Title</label>
-                  <input
-                    type="text"
-                    required
-                    value={newStorageName}
-                    onChange={(e) => setNewStorageName(e.target.value)}
-                    placeholder="e.g. Oak Wardrobe Cabinet..."
-                    className="w-full h-9 px-3 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-bold text-secondary">Type of Storage</label>
-                  <select
-                    value={newStorageType}
-                    onChange={(e) => setNewStorageType(e.target.value)}
-                    className="w-full h-9 px-3 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white"
-                  >
-                    <option value="Closet">Closet / Wardrobe</option>
-                    <option value="Drawer Set">Drawer Set</option>
-                    <option value="Open Shelf">Open Shelf</option>
-                    <option value="Heavy Bin">Heavy Bin / Trunk</option>
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="font-bold text-secondary">Compartments</label>
-                    <input
-                      type="number"
-                      required
-                      min={1}
-                      max={12}
-                      value={newStorageComp}
-                      onChange={(e) => setNewStorageComp(parseInt(e.target.value) || 1)}
-                      className="w-full h-9 px-3 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-bold text-secondary">Cabinet Picture</label>
-                    <div className="relative h-9">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleImageChange(e, setNewStorageImage)}
-                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
-                      />
-                      <div className="absolute inset-0 bg-canvas/30 rounded-xl border border-border-main/40 flex items-center justify-center gap-1.5 hover:bg-canvas/50">
-                        <ImageIcon className="w-3.5 h-3.5 text-secondary" />
-                        <span className="text-[10px] text-secondary font-medium">
-                          {newStorageImage ? 'Selected ✅' : 'Choose File'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-border-main/20 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddStorageOpen(false)}
-                    className="h-8.5 px-4 rounded-full bg-canvas text-secondary font-bold hover:bg-canvas/80"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="h-8.5 px-4 rounded-full bg-brand text-brand-foreground font-bold hover:brightness-95 shadow-sm"
-                  >
-                    Create Storage
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Add Item Modal Form */}
-      <AnimatePresence>
-        {isAddItemOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
-              className="absolute inset-0 bg-black/40 backdrop-blur-xs"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsAddItemOpen(false)}
-            />
-            <motion.div 
-              className="relative w-full max-w-md bg-card rounded-3xl border border-border-main/40 p-6 shadow-2xl z-10 space-y-4"
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-border-main/20">
-                <h3 className="text-sm font-bold text-primary">Add New Item Asset</h3>
-                <button onClick={() => setIsAddItemOpen(false)} className="p-1 hover:bg-canvas rounded-full text-secondary">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleAddItemSubmit} className="space-y-3.5 text-xs font-sans">
-                <div className="space-y-1">
-                  <label className="font-bold text-secondary">Item Title / Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={newItemName}
-                    onChange={(e) => setNewItemName(e.target.value)}
-                    placeholder="e.g. Leather Jacket..."
-                    className="w-full h-9 px-3 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand font-medium"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-bold text-secondary">Description / Details</label>
-                  <input
-                    type="text"
-                    value={newItemDesc}
-                    onChange={(e) => setNewItemDesc(e.target.value)}
-                    placeholder="Brief details about placement..."
-                    className="w-full h-9 px-3 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="font-bold text-secondary">Initial Quantity</label>
-                    <div className="flex items-center gap-1.5 bg-canvas/30 p-1 rounded-xl border border-border-main/40">
-                      <button
-                        type="button"
-                        onClick={() => setNewItemQty(q => Math.max(1, q - 1))}
-                        className="w-7 h-7 rounded-lg bg-card flex items-center justify-center border border-border-main/15 shadow-sm cursor-pointer"
-                      >
-                        <Minus className="w-3 h-3 text-secondary" />
-                      </button>
-                      <span className="flex-1 text-center font-bold text-primary">{newItemQty}</span>
-                      <button
-                        type="button"
-                        onClick={() => setNewItemQty(q => q + 1)}
-                        className="w-7 h-7 rounded-lg bg-brand/10 flex items-center justify-center border border-brand/20 shadow-sm cursor-pointer"
-                      >
-                        <Plus className="w-3 h-3 text-brand" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="font-bold text-secondary">Condition Rating</label>
-                    <select
-                      value={newItemCond}
-                      onChange={(e) => setNewItemCond(e.target.value as any)}
-                      className="w-full h-9 px-3 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white"
-                    >
-                      <option value="Mint">Mint / New</option>
-                      <option value="Good">Good / Used</option>
-                      <option value="Worn">Worn / Mending</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 items-center">
-                  <div className="space-y-1">
-                    <label className="font-bold text-secondary">Item Image</label>
-                    <div className="relative h-9">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleImageChange(e, setNewItemImage)}
-                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
-                      />
-                      <div className="absolute inset-0 bg-canvas/30 rounded-xl border border-border-main/40 flex items-center justify-center gap-1.5 hover:bg-canvas/50">
-                        <ImageIcon className="w-3.5 h-3.5 text-secondary" />
-                        <span className="text-[10px] text-secondary font-medium">
-                          {newItemImage ? 'Selected ✅' : 'Choose File'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-4 pl-1">
-                    <input
-                      type="checkbox"
-                      id="newItemSpare"
-                      checked={newItemSpare}
-                      onChange={(e) => setNewItemSpare(e.target.checked)}
-                      className="w-4 h-4 text-brand bg-canvas border-border-main/40 rounded focus:ring-brand"
-                    />
-                    <label htmlFor="newItemSpare" className="font-bold text-secondary select-none cursor-pointer">
-                      Flag as Spare
-                    </label>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-border-main/20 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddItemOpen(false)}
-                    className="h-8.5 px-4 rounded-full bg-canvas text-secondary font-bold hover:bg-canvas/80"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="h-8.5 px-4 rounded-full bg-brand text-brand-foreground font-bold hover:brightness-95 shadow-sm"
-                  >
-                    Create Asset
                   </button>
                 </div>
               </form>

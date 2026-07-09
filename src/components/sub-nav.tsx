@@ -19,14 +19,14 @@ const tabs: { id: SubNavTab; label: string; icon: typeof Package }[] = [
 
 export default function SubNav({ activeTab, onTabChange }: SubNavProps) {
   return (
-    <div className="flex items-center gap-1 p-1 bg-card border border-border-main/45 rounded-full w-fit shadow-sm">
+    <div className="flex items-center gap-1 p-1 bg-card border border-border-main/45 rounded-full max-w-full overflow-x-auto scrollbar-hide shadow-sm flex-nowrap">
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         return (
           <motion.button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`relative flex items-center gap-2 px-4.5 py-1.5 text-xs font-semibold rounded-full transition-colors duration-150 ${
+            className={`relative flex items-center gap-2 px-4.5 py-1.5 text-xs font-semibold rounded-full transition-colors duration-150 flex-shrink-0 ${
               isActive ? 'text-primary' : 'text-secondary hover:text-primary'
             }`}
             whileHover={{ scale: 1.03 }}

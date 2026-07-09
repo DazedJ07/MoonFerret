@@ -10,7 +10,7 @@ import { useNavigation, type ViewId } from '@/hooks/use-navigation';
 import { useSubNav } from '@/hooks/use-sub-nav';
 import { useItemCounts } from '@/hooks/use-item-counts';
 import type { Space } from '@/data/mock-data';
-import type { IndividualItem, StorageUnit } from '@/components/views/dashboard-view';
+import type { IndividualItem, StorageUnit } from '@/data/types';
 import { X, Image as ImageIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase, uploadImageToStorage } from '@/lib/supabase';
@@ -18,6 +18,7 @@ import AuthGateway from '@/components/auth-gateway';
 
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -118,7 +119,7 @@ export default function Home() {
       
       if (profile) {
         setUserName(profile.display_name || profile.username || 'Jian M.');
-        setWorkspaceTitle(profile.workspace_title || 'LaMoon Home');
+        setWorkspaceTitle(profile.workspace_title || 'MoonFerret Home');
         setProfilePic(profile.avatar_url || profile.profile_pic || null);
       }
 
@@ -128,18 +129,20 @@ export default function Home() {
         .select('*')
         .eq('user_id', activeUid);
 
-      if (spaces && spaces.length > 0) {
-        setSpacesList(spaces.map((s: any) => ({
-          id: s.id,
-          name: s.name,
-          slug: s.id,
-          icon: s.icon || 'Folder',
-          description: s.description || '',
-          imageCount: s.image_count || 2,
-          imageUrl: s.image_url || undefined,
-          dimensions: s.dimensions || undefined
-        })));
-      }
+      setSpacesList(
+        spaces
+          ? spaces.map((s: any) => ({
+              id: s.id,
+              name: s.name,
+              slug: s.id,
+              icon: s.icon || 'Folder',
+              description: s.description || '',
+              imageCount: s.image_count || 2,
+              imageUrl: s.image_url || undefined,
+              dimensions: s.dimensions || undefined,
+            }))
+          : []
+      );
 
       // 3. Fetch Storage Units from DB
       const { data: storages } = await supabase
@@ -147,20 +150,23 @@ export default function Home() {
         .select('*')
         .eq('user_id', activeUid);
 
-      if (storages && storages.length > 0) {
-        setStorageUnitsList(storages.map((s: any) => ({
-          id: s.id,
-          name: s.name,
-          spaceId: s.space_id,
-          spaceName: s.space_name || '',
-          totalItems: s.total_items || 0,
-          capacity: s.capacity || 20,
-          status: s.status || 'empty',
-          imageUrl: s.image_url || undefined,
-          compartments: s.compartments || 4,
-          type: s.type || 'Closet'
-        })));
-      }
+      setStorageUnitsList(
+        storages
+          ? storages.map((s: any) => ({
+              id: s.id,
+              name: s.name,
+              spaceId: s.space_id,
+              spaceName: s.space_name || '',
+              parentId: s.parent_id || null,
+              totalItems: s.total_items || 0,
+              capacity: s.capacity || 20,
+              status: s.status || 'empty',
+              imageUrl: s.image_url || undefined,
+              compartments: s.compartments || 4,
+              type: s.type || 'Closet',
+            }))
+          : []
+      );
 
       // 4. Fetch Individual Items from DB
       const { data: items } = await supabase
@@ -168,18 +174,27 @@ export default function Home() {
         .select('*')
         .eq('user_id', activeUid);
 
-      if (items && items.length > 0) {
-        setIndividualItemsList(items.map((i: any) => ({
-          id: i.id,
-          containerId: i.container_id,
-          name: i.name,
-          description: i.description || '',
-          imageUrl: i.image_url || undefined,
-          quantity: i.quantity || 1,
-          condition: i.condition || 'Good',
-          isSpare: i.is_spare || false
-        })));
-      }
+      setIndividualItemsList(
+        items
+          ? items.map((i: any) => ({
+              id: i.id,
+              containerId: i.container_id,
+              name: i.name,
+              description: i.description || '',
+              imageUrl: i.image_url || undefined,
+              quantity: i.quantity || 1,
+              condition: i.condition || 'Good',
+              isSpare: i.is_spare || false,
+              itemType: i.item_type || 'item-accessory',
+              category: i.category || undefined,
+              subCategory: i.sub_category || undefined,
+              size: i.size || undefined,
+              color: i.color || undefined,
+              material: i.material || undefined,
+              brand: i.brand || undefined,
+            }))
+          : []
+      );
 
       // 5. Fetch Notes from DB
       const { data: notes } = await supabase
@@ -187,14 +202,16 @@ export default function Home() {
         .select('*')
         .eq('user_id', activeUid);
 
-      if (notes && notes.length > 0) {
-        setNotesList(notes.map((n: any) => ({
-          id: n.id,
-          title: n.title,
-          body: n.body,
-          date: n.date || new Date(n.created_at).toLocaleDateString()
-        })));
-      }
+      setNotesList(
+        notes
+          ? notes.map((n: any) => ({
+              id: n.id,
+              title: n.title,
+              body: n.body,
+              date: n.date || new Date(n.created_at).toLocaleDateString(),
+            }))
+          : []
+      );
     } catch (e) {
       console.warn('Supabase hydration error (falling back to empty lists):', e);
     }
@@ -417,11 +434,12 @@ export default function Home() {
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         userId={userId}
+        onMenuToggle={() => setIsMobileSidebarOpen(true)}
       />
 
       {/* Main Three-Column Layout */}
-      <main className="max-w-[1600px] mx-auto px-6 py-6 font-sans">
-        <div className="flex gap-6 items-start">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 font-sans">
+        <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] xl:grid-cols-[240px_1fr_300px] gap-6 w-full min-w-0">
           {/* Left Sidebar */}
           <Sidebar 
             activeView={activeView} 
@@ -583,6 +601,55 @@ export default function Home() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile Sidebar Drawer Overlay */}
+      <AnimatePresence>
+        {isMobileSidebarOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden flex">
+            {/* Drawer Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileSidebarOpen(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-xs"
+            />
+            {/* Drawer Content Panel */}
+            <motion.div
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="relative w-72 max-w-[85vw] h-full bg-card border-r border-border-main/20 p-4 flex flex-col z-10"
+            >
+              {/* Close Button inside mobile drawer */}
+              <button
+                onClick={() => setIsMobileSidebarOpen(false)}
+                className="absolute top-4 right-4 p-1 hover:bg-canvas rounded-full text-secondary z-20 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <Sidebar
+                activeView={activeView}
+                onNavigate={(view) => {
+                  handleSidebarNavigate(view);
+                  setIsMobileSidebarOpen(false); // Auto close drawer on navigation
+                }}
+                spaces={spacesList}
+                onAddSpaceClick={() => {
+                  setIsAddSpaceOpen(true);
+                  setIsMobileSidebarOpen(false);
+                }}
+                onDeleteSpace={handleDeleteSpace}
+                totalItems={totalItemsCount}
+                utilization={utilizationRate}
+                className="w-full min-w-0 block"
+              />
             </motion.div>
           </div>
         )}

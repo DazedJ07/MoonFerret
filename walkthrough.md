@@ -1,31 +1,77 @@
-# MoonFerret — Restructuring, Auth & Styling Walkthrough
+# MoonFerret — Wardrobe & Storage Refactor Walkthrough
 
 ## Completed Refactoring Tasks
 
-1. **Restored Supabase Authentication & Lifespan Lifetimes**:
-   - Re-integrated the custom `AuthGateway` component import and rendering conditional logic inside [`src/app/page.tsx`](file:///C:/Users/Jian%20Medina/Desktop/LaMoon/src/app/page.tsx).
-   - Hooked up `supabase.auth.onAuthStateChange` subscription channels to properly capture login and sign-out actions.
-   - Enforced the 15-day session memory lifespan limit, redirecting the user back to the login gateway upon session expiration or manual sign-out instead of silently logging them into a guest profile.
-   - **Result**: Signing out now successfully returns you to the credential gateway, and your session details persist properly on reload.
-2. **Sub-Navigation Overhaul**:
-   - Re-implemented the rounded-full pill track style inside [`src/components/sub-nav.tsx`](file:///C:/Users/Jian%20Medina/Desktop/LaMoon/src/components/sub-nav.tsx).
-   - Added hover scaling transitions and mapped active pill highlight animations using your dynamic theme's `--brand` variables.
-3. **Workspace Cleanup**:
-   - Removed temporary diagnostic and recovery search scripts from the workspace root.
-4. **Verification**:
-   - The production build compiled successfully with zero type errors.
+1. **Recursive Sub-Storage Relations ($Storage \rightarrow Container \rightarrow Compartment$)**:
+   - Modified storage data structures in [`src/data/types.ts`](file:///C:/Users/Jian%20Medina/Desktop/LaMoon/src/data/types.ts) to support hierarchical nesting via a `parentId` field.
+   - Restructured [`src/components/views/dashboard-view.tsx`](file:///C:/Users/Jian%20Medina/Desktop/LaMoon/src/components/views/dashboard-view.tsx) to render only top-level storages initially, allowing one-click drill-down navigation into sub-containers and compartments, accompanied by a dynamic path breadcrumbs bar.
+   - Cascade-deletes all sub-storages and nested child items automatically inside the local state and Supabase tables.
+
+2. **Unified Poly-Classification Asset Flow**:
+   - Created a standalone modal [`src/components/modals/add-asset-modal.tsx`](file:///C:/Users/Jian%20Medina/Desktop/LaMoon/src/components/modals/add-asset-modal.tsx) featuring a segmented control toggle between `[Clothing Item]` and `[Item/Accessory]`.
+   - Conditionally renders relevant metadata form inputs (category, sub-category, size, color, material, brand) for apparel vs general assets.
+   - Implements **Dynamic Dependent Dropdowns** which dynamically filter child containers and compartments based on parent storage selections.
+
+3. **Omni-Outfit Builder**:
+   - Extracted and refactored the outfit compiler into a standalone modal [`src/components/modals/outfit-builder.tsx`](file:///C:/Users/Jian%20Medina/Desktop/LaMoon/src/components/modals/outfit-builder.tsx).
+   - Allows users to compile curated outfits from a heterogeneous mix of clothing items and accessories.
+   - Syncs saved outfits and outfit-to-item associations directly to Supabase (`outfits` and `outfit_items` tables).
+
+4. **Permanent Cloud Image Pipeline**:
+   - Eliminated all local `URL.createObjectURL` session blob URLs to prevent images vanishing on reload.
+   - Image selections trigger direct uploads to the `moonferret-images` bucket on Supabase, resolving public URLs before DB records are committed.
+   - Features upload loading indicators to prevent double-submits.
+
+5. **Defensive Viewport Resilience & Responsiveness**:
+   - Changed rigid pixel widths to fluid flex/grid layouts with `min-width: 0` constraints to eliminate text/image blowout on window resizing.
+   - Added an AnimatePresence-wrapped mobile sidebar drawer overlay inside [`src/app/page.tsx`](file:///C:/Users/Jian%20Medina/Desktop/LaMoon/src/app/page.tsx) that slides in from the left on mobile screens when the header hamburger menu is clicked.
+   - Styled the sub-nav pills and category filter pills to scroll horizontally on mobile with custom `scrollbar-hide` classes.
+
+6. **Animated List Grid**:
+   - Integrated a staggered entrance layout transition container [`src/components/dashboard/animated-list.tsx`](file:///C:/Users/Jian%20Medina/Desktop/LaMoon/src/components/dashboard/animated-list.tsx) for items, ensuring layout animations do not cause frame drops or lazy-loading jank.
+
+7. **Granular Category Filters**:
+   - Expanded navigation with the standalone [`src/components/pill-filter-nav.tsx`](file:///C:/Users/Jian%20Medina/Desktop/LaMoon/src/components/pill-filter-nav.tsx) component.
+   - Instantly slices inventory items by `All`, `Tops`, `Bottoms`, `Outerwear`, `Footwear`, or `Accessories` with reactive badge count indicators.
 
 ---
 
-## Detailed Modifications
+## Technical Specifications
 
-### 1. Auth State Management
-- Added `session` and `authLoading` React states to [`src/app/page.tsx`](file:///C:/Users/Jian%20Medina/Desktop/LaMoon/src/app/page.tsx).
-- Conditionally render `<AuthGateway />` panels if the user does not have a valid, active login session.
+### Central Types Schema
+```typescript
+export interface StorageUnit {
+  id: string;
+  name: string;
+  spaceId: string;
+  spaceName: string;
+  parentId: string | null;
+  totalItems: number;
+  capacity: number;
+  status: StorageStatus;
+  imageUrl?: string;
+  type?: StorageType;
+}
 
-### 2. Tab Bar Design
-- Overhauled sub-nav style:
-```diff
-- <div className="flex items-center gap-1 p-1 bg-canvas border border-border-main w-fit">
-+ <div className="flex items-center gap-1 p-1 bg-card border border-border-main/45 rounded-full w-fit shadow-sm">
+export interface IndividualItem {
+  id: string;
+  containerId: string;
+  name: string;
+  description: string;
+  imageUrl?: string;
+  quantity: number;
+  condition: ItemCondition;
+  isSpare: boolean;
+  itemType: ItemType;
+  category?: ClothingCategory;
+  subCategory?: string;
+  size?: string;
+  color?: string;
+  material?: string;
+  brand?: string;
+}
 ```
+
+### Verification
+- Production build successfully completed (`npm run build`)
+- Statically generated page data check passed with zero type errors.
