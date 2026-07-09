@@ -296,7 +296,7 @@ export default function Home() {
 
     if (userId) {
       try {
-        await supabase.from('spaces').insert({
+        const { error } = await supabase.from('spaces').insert({
           id: newSpace.id,
           name: newSpace.name,
           description: newSpace.description,
@@ -305,6 +305,7 @@ export default function Home() {
           dimensions: newSpace.dimensions || null,
           user_id: userId
         });
+        if (error) throw error;
       } catch (err) {
         console.error('Supabase space insert fail:', err);
       }
@@ -323,12 +324,13 @@ export default function Home() {
 
     if (userId) {
       try {
-        await supabase.from('spaces').update({
+        const { error } = await supabase.from('spaces').update({
           name: updatedFields.name,
           description: updatedFields.description,
           dimensions: updatedFields.dimensions,
           image_url: updatedFields.imageUrl
         }).eq('id', id).eq('user_id', userId);
+        if (error) throw error;
       } catch (err) {
         console.error('Supabase space update fail:', err);
       }
@@ -355,9 +357,11 @@ export default function Home() {
 
     if (userId) {
       try {
-        await supabase.from('spaces').delete().eq('id', id).eq('user_id', userId);
+        const { error: spaceError } = await supabase.from('spaces').delete().eq('id', id).eq('user_id', userId);
+        if (spaceError) throw spaceError;
         // Cascades to delete nested storage units inside DB
-        await supabase.from('storages').delete().eq('space_id', id).eq('user_id', userId);
+        const { error: storageError } = await supabase.from('storages').delete().eq('space_id', id).eq('user_id', userId);
+        if (storageError) throw storageError;
       } catch (err) {
         console.error('Supabase space delete fail:', err);
       }
@@ -377,13 +381,14 @@ export default function Home() {
 
     if (userId) {
       try {
-        await supabase.from('notes').insert({
+        const { error } = await supabase.from('notes').insert({
           id: newNote.id,
           title: newNote.title,
           body: newNote.body,
           date: newNote.date,
           user_id: userId
         });
+        if (error) throw error;
       } catch (err) {
         console.error('Supabase note insert fail:', err);
       }

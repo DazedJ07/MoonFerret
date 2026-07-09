@@ -50,10 +50,7 @@ export default function Header({
     // Initialize theme from local storage safely on client mount
     const savedTheme = localStorage.getItem('lamoon-theme') || 'Minimalist Blue';
     const savedCustom = localStorage.getItem('lamoon-custom-color') || '#38bdf8';
-    setActiveTheme(savedTheme);
-    setCustomColor(savedCustom);
-    applyTheme(savedTheme, savedCustom);
-
+    
     // Initialize light/dark mode (light is default)
     const savedMode = (localStorage.getItem('moonferret-theme-mode') as 'light' | 'dark') || 'light';
     setThemeMode(savedMode);
@@ -62,42 +59,54 @@ export default function Header({
     } else {
       document.documentElement.classList.remove('dark');
     }
+
+    setActiveTheme(savedTheme);
+    setCustomColor(savedCustom);
+    applyTheme(savedTheme, savedCustom, savedMode);
   }, []);
 
-  const applyTheme = (themeName: string, customHex: string) => {
+  const applyTheme = (themeName: string, customHex: string, mode: 'light' | 'dark' = 'light') => {
     let cssValue = '#bae6fd'; // Minimalist Blue default (sky-200)
     let accentVal = '#0ea5e9'; // sky-500 default
     let accentForegroundVal = '#ffffff';
 
+    const isDarkPreset = mode === 'dark';
+
     if (themeName === 'Minimalist Blue') {
-      cssValue = '#bae6fd';
-      accentVal = '#0ea5e9';
+      cssValue = isDarkPreset ? '#0c4a6e' : '#bae6fd';
+      accentVal = isDarkPreset ? '#38bdf8' : '#0ea5e9';
       accentForegroundVal = '#ffffff';
     } else if (themeName === 'Cyber Monochrome') {
-      cssValue = '#f3f4f6';
-      accentVal = '#1c1917'; // Stone-900 (Charcoal)
-      accentForegroundVal = '#ffffff';
+      cssValue = isDarkPreset ? '#27272a' : '#f3f4f6';
+      accentVal = isDarkPreset ? '#f4f4f5' : '#1c1917';
+      accentForegroundVal = isDarkPreset ? '#18181b' : '#ffffff';
     } else if (themeName === 'Nordic Sage') {
-      cssValue = '#d1fae5';
-      accentVal = '#10b981'; // Emerald-500
+      cssValue = isDarkPreset ? '#064e3b' : '#d1fae5';
+      accentVal = isDarkPreset ? '#34d399' : '#10b981';
       accentForegroundVal = '#ffffff';
     } else if (themeName === 'Aurora Borealis') {
-      cssValue = 'linear-gradient(to right, #2dd4bf, #3b82f6)';
-      accentVal = '#06b6d4'; // Teal-500
+      cssValue = isDarkPreset 
+        ? 'linear-gradient(to right, #0d9488, #1d4ed8)' 
+        : 'linear-gradient(to right, #2dd4bf, #3b82f6)';
+      accentVal = isDarkPreset ? '#0891b2' : '#06b6d4';
       accentForegroundVal = '#ffffff';
     } else if (themeName === 'Sunset Minimal') {
-      cssValue = 'linear-gradient(to right, #f59e0b, #ec4899)';
-      accentVal = '#f43f5e'; // Rose-500
+      cssValue = isDarkPreset 
+        ? 'linear-gradient(to right, #b45309, #be185d)' 
+        : 'linear-gradient(to right, #f59e0b, #ec4899)';
+      accentVal = isDarkPreset ? '#e11d48' : '#f43f5e';
       accentForegroundVal = '#ffffff';
     } else if (themeName === 'Deep Space') {
-      cssValue = 'linear-gradient(to right, #0f172a, #1e293b)';
-      accentVal = '#475569'; // Slate-600
+      cssValue = isDarkPreset 
+        ? 'linear-gradient(to right, #020617, #0f172a)' 
+        : 'linear-gradient(to right, #0f172a, #1e293b)';
+      accentVal = isDarkPreset ? '#334155' : '#475569';
       accentForegroundVal = '#ffffff';
     } else if (themeName === 'Custom') {
       cssValue = customHex;
       accentVal = customHex;
       // Contrast check for custom hex to assign black or white text dynamically
-      accentForegroundVal = isThemeDark('Custom', customHex) ? '#ffffff' : '#1c1917';
+      accentForegroundVal = isThemeDark('Custom', customHex, mode) ? '#ffffff' : '#1c1917';
     }
     
     document.documentElement.style.setProperty('--header-accent', cssValue);
@@ -119,6 +128,7 @@ export default function Header({
     } else {
       document.documentElement.classList.remove('dark');
     }
+    applyTheme(activeTheme, customColor, nextMode);
   };
 
   const handleOpen = () => {
@@ -145,7 +155,7 @@ export default function Header({
     setUserName(tempName);
     setWorkspaceTitle(tempTitle);
     setProfilePic(tempPic);
-    applyTheme(activeTheme, customColor);
+    applyTheme(activeTheme, customColor, themeMode);
 
     if (userId) {
       try {
@@ -184,7 +194,23 @@ export default function Header({
   };
 
   // Determine if the current active header theme background is dark or light
-  const isThemeDark = (themeName: string, customHex: string) => {
+  const isThemeDark = (themeName: string, customHex: string, currentMode?: 'light' | 'dark') => {
+    const activeMode = currentMode || themeMode;
+    if (activeMode === 'dark') {
+      if (themeName === 'Custom') {
+        const hex = customHex.replace('#', '');
+        if (hex.length === 6) {
+          const r = parseInt(hex.substring(0, 2), 16);
+          const g = parseInt(hex.substring(2, 4), 16);
+          const b = parseInt(hex.substring(4, 6), 16);
+          const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+          return luminance < 0.65;
+        }
+        return false;
+      }
+      return true; // All default presets are dark in dark mode
+    }
+
     if (themeName === 'Deep Space' || themeName === 'Aurora Borealis' || themeName === 'Sunset Minimal') {
       return true;
     }
@@ -418,7 +444,7 @@ export default function Header({
                           <button
                             key={theme}
                             type="button"
-                            onClick={() => { setActiveTheme(theme); applyTheme(theme, customColor); }}
+                            onClick={() => { setActiveTheme(theme); applyTheme(theme, customColor, themeMode); }}
                             className={`py-1.5 rounded-lg border text-[10px] font-bold transition-all cursor-pointer ${
                               isSel 
                                 ? 'bg-brand/10 border-brand text-brand' 
@@ -442,7 +468,7 @@ export default function Header({
                           <button
                             key={theme}
                             type="button"
-                            onClick={() => { setActiveTheme(theme); applyTheme(theme, customColor); }}
+                            onClick={() => { setActiveTheme(theme); applyTheme(theme, customColor, themeMode); }}
                             className={`py-1.5 rounded-lg border text-[10px] font-bold transition-all cursor-pointer ${
                               isSel 
                                 ? 'bg-indigo-500/10 border-indigo-400 text-indigo-600' 
@@ -467,7 +493,7 @@ export default function Header({
                           const val = e.target.value;
                           setCustomColor(val);
                           setActiveTheme('Custom');
-                          applyTheme('Custom', val);
+                          applyTheme('Custom', val, themeMode);
                         }}
                         className="w-7 h-7 rounded border border-border-main/20 cursor-pointer"
                       />

@@ -113,19 +113,21 @@ function MyOutfitsView({
 
     if (userId) {
       try {
-        await supabase.from('outfits').insert({
+        const { error: outfitError } = await supabase.from('outfits').insert({
           id: newOutfitId,
           name: outfitData.name,
           image_url: outfitData.imageUrl || null,
           user_id: userId,
         });
+        if (outfitError) throw outfitError;
 
         const relationRows = outfitData.itemIds.map((itemId) => ({
           outfit_id: newOutfitId,
           item_id: itemId,
         }));
 
-        await supabase.from('outfit_items').insert(relationRows);
+        const { error: relationError } = await supabase.from('outfit_items').insert(relationRows);
+        if (relationError) throw relationError;
       } catch (err) {
         console.error('Error saving outfit:', err);
       }
@@ -138,8 +140,10 @@ function MyOutfitsView({
 
     if (userId) {
       try {
-        await supabase.from('outfits').delete().eq('id', id).eq('user_id', userId);
-        await supabase.from('outfit_items').delete().eq('outfit_id', id);
+        const { error: outfitError } = await supabase.from('outfits').delete().eq('id', id).eq('user_id', userId);
+        if (outfitError) throw outfitError;
+        const { error: relationError } = await supabase.from('outfit_items').delete().eq('outfit_id', id);
+        if (relationError) throw relationError;
       } catch (err) {
         console.error('Error deleting outfit:', err);
       }
@@ -268,10 +272,11 @@ function MyNotesView({ notes, setNotes, userId }: MyNotesViewProps) {
       
       if (userId) {
         try {
-          await supabase.from('notes').update({
+          const { error } = await supabase.from('notes').update({
             title: editorTitle.trim(),
             body: editorBody.trim(),
           }).eq('id', activeNoteId).eq('user_id', userId);
+          if (error) throw error;
         } catch (err) {
           console.error('Error updating note:', err);
         }
@@ -290,13 +295,14 @@ function MyNotesView({ notes, setNotes, userId }: MyNotesViewProps) {
 
       if (userId) {
         try {
-          await supabase.from('notes').insert({
+          const { error } = await supabase.from('notes').insert({
             id: newId,
             title: editorTitle.trim(),
             body: editorBody.trim(),
             date: dateStr,
             user_id: userId
           });
+          if (error) throw error;
         } catch (err) {
           console.error('Error creating note:', err);
         }
@@ -319,7 +325,8 @@ function MyNotesView({ notes, setNotes, userId }: MyNotesViewProps) {
 
     if (userId) {
       try {
-        await supabase.from('notes').delete().eq('id', id).eq('user_id', userId);
+        const { error } = await supabase.from('notes').delete().eq('id', id).eq('user_id', userId);
+        if (error) throw error;
       } catch (err) {
         console.error('Error deleting note:', err);
       }
@@ -674,7 +681,7 @@ export default function MainContent({
             />
           )}
           {activeTab === 'my-items' ? null : (
-            <div className="bg-card rounded-2xl border border-border-main/40 p-6 shadow-sm font-sans">
+            <div className="glass-liquid rounded-2xl p-6 font-sans">
               {activeTab === 'my-outfits' && (
                 <MyOutfitsView 
                   items={individualItemsList} 

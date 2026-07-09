@@ -355,7 +355,7 @@ export default function DashboardView({
 
     if (userId) {
       try {
-        await supabase.from('storages').insert(
+        const { error } = await supabase.from('storages').insert(
           allUnits.map((unit) => ({
             id: unit.id,
             name: unit.name,
@@ -371,6 +371,7 @@ export default function DashboardView({
             user_id: userId,
           }))
         );
+        if (error) throw error;
       } catch (err) {
         console.error('Supabase insert storage fail:', err);
       }
@@ -424,7 +425,7 @@ export default function DashboardView({
 
     if (userId) {
       try {
-        await supabase.from('items').insert({
+        const { error: itemError } = await supabase.from('items').insert({
           id: newItem.id,
           container_id: newItem.containerId,
           name: newItem.name,
@@ -442,14 +443,16 @@ export default function DashboardView({
           brand: newItem.brand || null,
           user_id: userId
         });
+        if (itemError) throw itemError;
 
         const parentStorage = storageUnitsList.find(su => su.id === newItem.containerId);
         if (parentStorage) {
           const nextTotal = parentStorage.totalItems + newItem.quantity;
-          await supabase.from('storages').update({
+          const { error: updateError } = await supabase.from('storages').update({
             total_items: nextTotal,
             status: nextTotal >= parentStorage.capacity ? 'full' : nextTotal > 0 ? 'has-spares' : 'empty'
           }).eq('id', newItem.containerId).eq('user_id', userId);
+          if (updateError) throw updateError;
         }
       } catch (err) {
         console.error('Supabase insert item fail:', err);
@@ -658,7 +661,7 @@ export default function DashboardView({
                     className={`text-left rounded-2xl border p-4.5 flex flex-col justify-between h-48 shadow-sm transition-all duration-300 hover:scale-[1.01] hover:shadow-md relative overflow-hidden group ${
                       isSelected && !isOverall
                         ? 'border-brand bg-brand/5 ring-1 ring-brand/30'
-                        : 'border-border-main/45 bg-card'
+                        : 'border-border-main/45 bg-card/65 backdrop-blur-md dark:bg-card/35'
                     } ${isOverall ? 'cursor-default' : 'cursor-pointer'}`}
                   >
                     {/* Explicit Delete Button */}
