@@ -79,22 +79,20 @@ export default function Home() {
     }
   }, [spacesList, activeView, navigate]);
 
-  // 2. Direct Callback: Sidebar navigation changes activeView and carousel state directly
-  const handleSidebarNavigate = useCallback((spaceId: ViewId) => {
-    navigate(spaceId);
-    switchTab('my-items'); // Always reset to items tab when navigating
-    if (spacesList.length === 0) return;
-    
+  // Synchronize carousel index with activeView whenever spacesList or activeView changes
+  useEffect(() => {
+    if (!isMounted || spacesList.length === 0) return;
+
     const len = spacesList.length + 1;
     const currentNormalized = ((activeCarouselIndex % len) + len) % len;
 
-    if (spaceId === 'dashboard') {
+    if (activeView === 'dashboard') {
       if (currentNormalized !== 0) {
         const diff = 0 - currentNormalized;
         setActiveCarouselIndex(prev => prev + diff);
       }
     } else {
-      const targetIdx = spacesList.findIndex((s) => s.id === spaceId);
+      const targetIdx = spacesList.findIndex((s) => s.id === activeView);
       if (targetIdx !== -1) {
         const expectedNormalized = targetIdx + 1;
         if (currentNormalized !== expectedNormalized) {
@@ -105,7 +103,13 @@ export default function Home() {
         }
       }
     }
-  }, [spacesList, activeCarouselIndex, navigate, switchTab]);
+  }, [spacesList, activeView, isMounted, activeCarouselIndex]);
+
+  // 2. Direct Callback: Sidebar navigation changes activeView directly
+  const handleSidebarNavigate = useCallback((spaceId: ViewId) => {
+    navigate(spaceId);
+    switchTab('my-items'); // Always reset to items tab when navigating
+  }, [navigate, switchTab]);
 
   // Supabase Async Hydrator on Client Mount
   const fetchDashboardData = useCallback(async (activeUid: string) => {
