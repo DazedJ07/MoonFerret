@@ -195,18 +195,22 @@ export default function OutfitBuilder({
                         <div className={`absolute top-1.5 right-1.5 w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
                           isSelected
                             ? 'bg-brand border-brand text-white'
-                            : 'border-border-main/30 bg-white/70'
+                            : 'border-border-main/30 bg-card/70'
                         }`}>
                           {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
                         </div>
 
                         {/* Thumbnail */}
-                        <div className="h-20 w-full rounded-lg overflow-hidden bg-canvas border border-border-main/10 flex items-center justify-center">
+                        <div className="h-20 w-full rounded-lg overflow-hidden bg-canvas border border-border-main/10 flex items-center justify-center relative">
                           {item.imageUrl ? (
                             <img
                               src={item.imageUrl}
                               alt={item.name}
-                              className="w-full h-full object-cover"
+                              className={
+                                item.imageUrl.endsWith('#contain')
+                                  ? 'max-w-full max-h-full object-contain w-auto h-auto rounded-lg absolute inset-0 m-auto'
+                                  : 'w-full h-full object-cover'
+                              }
                             />
                           ) : (
                             <span className="text-xl font-bold text-secondary/30">{initialLetter}</span>

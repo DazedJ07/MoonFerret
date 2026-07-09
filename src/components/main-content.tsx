@@ -205,7 +205,11 @@ function MyOutfitsView({
                     <img 
                       src={matchedItem.imageUrl} 
                       alt={matchedItem.name} 
-                      className="w-full h-full object-cover" 
+                      className={
+                        matchedItem.imageUrl.endsWith('#contain')
+                          ? 'max-w-full max-h-full object-contain w-auto h-auto rounded-lg absolute inset-0 m-auto'
+                          : 'w-full h-full object-cover'
+                      } 
                     />
                   </div>
                 );

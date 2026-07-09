@@ -65,12 +65,16 @@ export default function ItemDetailModal({
             </button>
 
             {/* Top Image Section */}
-            <div className="relative h-48 bg-canvas flex items-center justify-center border-b border-border-main/10 overflow-hidden">
+            <div className="relative h-48 bg-canvas/30 flex items-center justify-center border-b border-border-main/10 overflow-hidden p-4">
               {item.imageUrl ? (
                 <img
                   src={item.imageUrl}
                   alt={item.name}
-                  className="w-full h-full object-cover"
+                  className={
+                    item.imageUrl.endsWith('#contain')
+                      ? 'max-w-full max-h-full object-contain w-auto h-auto rounded-lg'
+                      : 'w-full h-full object-cover'
+                  }
                 />
               ) : (
                 <div className="w-full h-full bg-gradient-to-tr from-brand/20 to-brand/5 flex items-center justify-center">

@@ -41,6 +41,11 @@ export default function AddAssetModal({
   const [isSpare, setIsSpare] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  
+  // Custom Thumbnail background removal and size fit options
+  const [imageFit, setImageFit] = useState<'cover' | 'contain'>('cover');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
 
   // Clothing specific states
   const [category, setCategory] = useState<ClothingCategory>('Tops');
@@ -138,6 +143,7 @@ export default function AddAssetModal({
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedFile(file);
       setIsUploading(true);
       try {
         const url = await uploadImageToStorage(file, 'items');
@@ -152,6 +158,37 @@ export default function AddAssetModal({
     }
   };
 
+  // Client-side Background Removal handler
+  const handleRemoveBackground = async () => {
+    if (!selectedFile) return;
+    setIsRemovingBg(true);
+    try {
+      // Dynamic import to optimize Next.js initial bundle sizes
+      const { removeBackground } = (await import('@imgly/background-removal')) as any;
+      
+      console.log('Removing background client-side...');
+      const imageBlob = await removeBackground(selectedFile);
+      
+      // Convert transparent image Blob back to File format
+      const processedFile = new File([imageBlob], `processed_${Date.now()}.png`, { type: 'image/png' });
+      
+      setIsUploading(true);
+      const url = await uploadImageToStorage(processedFile, 'items');
+      if (url) {
+        setImageUrl(url);
+        // Automatically default transparency outline images to contain
+        setImageFit('contain');
+        console.log('Background removed successfully and uploaded!');
+      }
+    } catch (err) {
+      console.error('Failed to process background removal:', err);
+      alert('Failed to remove background. Processing is resource-intensive and might fail on some devices or file formats.');
+    } finally {
+      setIsUploading(false);
+      setIsRemovingBg(false);
+    }
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -160,11 +197,16 @@ export default function AddAssetModal({
       return;
     }
 
+    // Append image fit preference as URL hash to prevent schema layout conflicts
+    const finalImageUrl = imageUrl
+      ? `${imageUrl.split('#')[0]}#${imageFit}`
+      : undefined;
+
     const baseItem = {
       containerId: targetContainerId,
       name: name.trim(),
       description: description.trim(),
-      imageUrl: imageUrl || undefined,
+      imageUrl: finalImageUrl,
       quantity,
       condition,
       isSpare,
@@ -192,6 +234,9 @@ export default function AddAssetModal({
     setCondition('Good');
     setIsSpare(false);
     setImageUrl(null);
+    setSelectedFile(null);
+    setImageFit('cover');
+    setIsRemovingBg(false);
     setCategory('Tops');
     setSubCategory('');
     setSize('');
@@ -247,7 +292,7 @@ export default function AddAssetModal({
                 {itemType === 'clothing' && (
                   <motion.div
                     layoutId="itemTypeActive"
-                    className="absolute inset-0 bg-white rounded-lg shadow-sm border border-border-main/5"
+                    className="absolute inset-0 bg-card rounded-lg shadow-sm border border-border-main/5"
                     transition={{ type: 'spring', stiffness: 450, damping: 30 }}
                   />
                 )}
@@ -266,7 +311,7 @@ export default function AddAssetModal({
                 {itemType === 'item-accessory' && (
                   <motion.div
                     layoutId="itemTypeActive"
-                    className="absolute inset-0 bg-white rounded-lg shadow-sm border border-border-main/5"
+                    className="absolute inset-0 bg-card rounded-lg shadow-sm border border-border-main/5"
                     transition={{ type: 'spring', stiffness: 450, damping: 30 }}
                   />
                 )}
@@ -479,20 +524,79 @@ export default function AddAssetModal({
               </div>
 
               {/* Image Upload */}
-              <div className="space-y-1.5">
+              <div className="space-y-2.5">
                 <label className="font-bold text-secondary block">Thumbnail Image</label>
+
+                {/* Visual Preview Box with dynamic size preference preview */}
+                {imageUrl && (
+                  <div className="relative border border-border-main/20 bg-canvas/30 rounded-2xl overflow-hidden p-3 flex flex-col items-center justify-center gap-2">
+                    <div className="relative w-full h-40 flex items-center justify-center bg-transparent">
+                      <img 
+                        id="output-image"
+                        src={imageUrl} 
+                        alt="Preview" 
+                        className={`max-w-full max-h-full rounded-lg ${imageFit === 'contain' ? 'object-contain w-auto h-auto' : 'object-cover w-full h-full'}`} 
+                      />
+                    </div>
+
+                    <div className="flex w-full items-center justify-between gap-4 mt-1 border-t border-border-main/10 pt-2.5">
+                      {/* Image Fit controls (size preference) */}
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9px] font-bold text-secondary uppercase tracking-wider">Thumbnail Fit</span>
+                        <div className="flex gap-1 bg-canvas p-0.5 rounded-lg border border-border-main/15">
+                          <button
+                            type="button"
+                            onClick={() => setImageFit('cover')}
+                            className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                              imageFit === 'cover' ? 'bg-card text-primary shadow-xs' : 'text-secondary hover:text-primary'
+                            }`}
+                          >
+                            Cover (Square Crop)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setImageFit('contain')}
+                            className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                              imageFit === 'contain' ? 'bg-card text-primary shadow-xs' : 'text-secondary hover:text-primary'
+                            }`}
+                          >
+                            Contain (Fit Image)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Remove Background Action */}
+                      {selectedFile && (
+                        <button
+                          type="button"
+                          disabled={isRemovingBg || isUploading}
+                          onClick={handleRemoveBackground}
+                          className="h-8 px-3 rounded-full bg-brand text-brand-foreground hover:brightness-95 flex items-center gap-1 cursor-pointer font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {isRemovingBg ? (
+                            <div className="w-3.5 h-3.5 rounded-full border-2 border-brand-foreground/30 border-t-brand-foreground animate-spin" />
+                          ) : (
+                            <Sparkles className="w-3.5 h-3.5" />
+                          )}
+                          {isRemovingBg ? 'Processing...' : 'Remove BG'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="relative h-9">
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleImageChange}
-                    disabled={isUploading}
+                    disabled={isUploading || isRemovingBg}
                     className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
                   />
                   <div className="absolute inset-0 bg-canvas/30 rounded-xl border border-border-main/40 flex items-center justify-center gap-1.5 hover:bg-canvas/50">
                     <ImageIcon className="w-3.5 h-3.5 text-secondary" />
                     <span className="text-[10px] text-secondary font-medium">
-                      {isUploading ? 'Uploading...' : imageUrl ? 'Uploaded ✅' : 'Choose File'}
+                      {isUploading ? 'Uploading...' : imageUrl ? 'Change Photo' : 'Choose File'}
                     </span>
                   </div>
                 </div>

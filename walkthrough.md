@@ -34,6 +34,11 @@
    - Expanded navigation with the standalone [`src/components/pill-filter-nav.tsx`](file:///C:/Users/Jian%20Medina/Desktop/LaMoon/src/components/pill-filter-nav.tsx) component.
    - Instantly slices inventory items by `All`, `Tops`, `Bottoms`, `Outerwear`, `Footwear`, or `Accessories` with reactive badge count indicators.
 
+8. **Seamless Light & Dark Theme Toggling**:
+   - Added support for dark mode class toggles on the HTML element by defining `.dark` variables in [`src/app/globals.css`](file:///C:/Users/Jian%20Medina/Desktop/LaMoon/src/app/globals.css) that override surface colors (`--bg-canvas`, `--bg-card`, `--border-main`, `--text-primary`, `--text-secondary`).
+   - Implemented global focused-input theme rules for selects, inputs, and textareas inside dark mode to prevent bright white flash overlaps.
+   - Integrated the credential gateway [`src/components/auth-gateway.tsx`](file:///C:/Users/Jian%20Medina/Desktop/LaMoon/src/components/auth-gateway.tsx) to adapt to active color brand tints and light/dark modes cohesively.
+
 ---
 
 ## Technical Specifications

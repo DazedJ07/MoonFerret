@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@imgly/background-removal": "^1.7.0",
     "@supabase/supabase-js": "^2.110.0",
     "gsap": "^3.15.0",
     "lucide-react": "^1.23.0",

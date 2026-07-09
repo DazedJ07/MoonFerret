@@ -762,7 +762,15 @@ export default function DashboardView({
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-10 h-10 rounded-xl bg-canvas overflow-hidden shrink-0 border border-border-main/20 relative">
                         {item.imageUrl ? (
-                          <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                          <img 
+                            src={item.imageUrl} 
+                            alt={item.name} 
+                            className={
+                              item.imageUrl.endsWith('#contain')
+                                ? 'max-w-full max-h-full object-contain w-auto h-auto rounded-lg absolute inset-0 m-auto'
+                                : 'w-full h-full object-cover'
+                            } 
+                          />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-brand/10 text-brand font-bold text-xs">
                             {item.name.charAt(0)}
