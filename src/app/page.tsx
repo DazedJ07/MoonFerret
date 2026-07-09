@@ -47,8 +47,8 @@ export default function Home() {
   // Global search bar state
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Active Carousel Index state (can go negative/positive indefinitely for infinite loop)
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
+  const [hasRestored, setHasRestored] = useState(false);
 
   // Add Space Modal states
   const [isAddSpaceOpen, setIsAddSpaceOpen] = useState(false);
@@ -242,18 +242,18 @@ export default function Home() {
     }
   }, []);
 
-  // Save activeView and activeTab to localStorage on changes
+  // Save activeView and activeTab to localStorage on changes (only after restoring!)
   useEffect(() => {
-    if (isMounted && activeView) {
+    if (hasRestored && activeView) {
       localStorage.setItem('moonferret-active-view', activeView);
     }
-  }, [activeView, isMounted]);
+  }, [activeView, hasRestored]);
 
   useEffect(() => {
-    if (isMounted && activeTab) {
+    if (hasRestored && activeTab) {
       localStorage.setItem('moonferret-active-tab', activeTab);
     }
-  }, [activeTab, isMounted]);
+  }, [activeTab, hasRestored]);
 
   // established useEffect Auth Check
   useEffect(() => {
@@ -269,6 +269,8 @@ export default function Home() {
     if (restoredTab) {
       switchTab(restoredTab as any);
     }
+
+    setHasRestored(true);
 
     const initSession = async () => {
       try {
