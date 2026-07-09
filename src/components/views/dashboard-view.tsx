@@ -572,7 +572,7 @@ export default function DashboardView({
           {!isOverall && (
             <button
               onClick={handleOpenCustomize}
-              className="h-7 px-3 bg-white hover:bg-canvas border border-border-main/40 text-secondary rounded-full text-[10px] font-bold shadow-xs transition-all flex items-center gap-1 cursor-pointer font-sans"
+              className="h-7 px-3 bg-card hover:bg-canvas border border-border-main/40 text-secondary rounded-full text-[10px] font-bold shadow-xs transition-all flex items-center gap-1 cursor-pointer font-sans"
             >
               <Edit3 className="w-3 h-3 text-secondary" />
               Customize Space
@@ -663,7 +663,7 @@ export default function DashboardView({
                           e.stopPropagation();
                           handleDeleteStorage(unit.id);
                         }}
-                        className="absolute top-3 right-3 z-20 p-1.5 bg-white hover:bg-rose-50 rounded-full border border-border-main/30 shadow-md text-stone-400 hover:text-rose-500 transition-all duration-200 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 cursor-pointer"
+                        className="absolute top-3 right-3 z-20 p-1.5 bg-card hover:bg-rose-500/10 rounded-full border border-border-main/30 shadow-md text-stone-400 hover:text-rose-500 transition-all duration-200 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 cursor-pointer"
                         title="Delete Storage"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

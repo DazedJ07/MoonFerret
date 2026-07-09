@@ -28,6 +28,19 @@
   --foreground: var(--text-primary);
 }
 
+.dark {
+  /* Canvas & Surface */
+  --bg-canvas: #0A0A0C;
+  --bg-card: #151518;
+
+  /* Typography */
+  --text-primary: #F4F4F5;
+  --text-secondary: #A1A1AA;
+
+  /* Structural Borders */
+  --border-main: #27272A;
+}
+
 /* ───────────────────────────────────────────
    TAILWIND v4 THEME MAPPING
    Maps CSS variables → Tailwind utility classes
@@ -118,4 +131,12 @@ html {
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* Dark mode input focus overrides */
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+  background-color: var(--bg-canvas) !important;
+  color: var(--text-primary) !important;
 }

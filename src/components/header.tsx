@@ -291,8 +291,12 @@ export default function Header({
             whileTap={{ scale: 0.97 }}
             className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all cursor-pointer ${
               isDark 
-                ? 'bg-white/10 hover:bg-white/20 border-white/10 text-amber-400' 
-                : 'bg-white/60 hover:bg-white/80 border-stone-200/20 text-stone-600'
+                ? 'bg-white/10 hover:bg-white/20 border-white/10' 
+                : 'bg-white/60 hover:bg-white/80 border-stone-200/20'
+            } ${
+              themeMode === 'dark' 
+                ? 'text-amber-400' 
+                : isDark ? 'text-stone-300' : 'text-stone-600'
             }`}
             title={themeMode === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
           >

@@ -99,14 +99,14 @@ export default function AuthGateway({ onSuccess }: AuthGatewayProps) {
 
       {/* 2. Foreground Center Form Card matching image_9ea56b.jpg */}
       <motion.div
-        className="relative z-10 w-full max-w-sm bg-white rounded-3xl border border-stone-200/50 shadow-[0_24px_50px_-12px_rgba(0,0,0,0.3)] p-8 space-y-6"
+        className="relative z-10 w-full max-w-sm bg-card rounded-3xl border border-border-main/20 shadow-[0_24px_50px_-12px_rgba(0,0,0,0.3)] p-8 space-y-6"
         initial={{ scale: 0.95, opacity: 0, y: 15 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 260, damping: 24 }}
       >
         {/* Brand logo Moonferret */}
         <div className="flex flex-col items-center text-center space-y-2">
-          <div className="w-14 h-14 bg-stone-50 border border-stone-200/50 rounded-2xl flex items-center justify-center p-3 shadow-inner">
+          <div className="w-14 h-14 bg-canvas border border-border-main/20 rounded-2xl flex items-center justify-center p-3 shadow-inner">
             <img 
               src="/Ico/Moonferret.ico" 
               alt="MoonFerret Logo" 
@@ -114,15 +114,15 @@ export default function AuthGateway({ onSuccess }: AuthGatewayProps) {
             />
           </div>
           <div className="space-y-1">
-            <h2 className="text-xl font-bold text-stone-900 tracking-tight">MoonFerret</h2>
-            <p className="text-xs text-stone-500 font-medium">Minimalist Household Inventory</p>
+            <h2 className="text-xl font-bold text-primary tracking-tight">MoonFerret</h2>
+            <p className="text-xs text-secondary font-medium">Minimalist Household Inventory</p>
           </div>
         </div>
 
         {/* Sliding horizontal selection bar */}
-        <div className="relative flex bg-stone-100 p-1 rounded-full border border-stone-200/20">
+        <div className="relative flex bg-canvas p-1 rounded-full border border-border-main/20">
           <motion.div
-            className="absolute top-1 bottom-1 bg-white rounded-full shadow-sm"
+            className="absolute top-1 bottom-1 bg-card rounded-full shadow-sm"
             layoutId="activeTabBg"
             animate={{
               left: activeTab === 'signin' ? '4px' : '50%',
@@ -134,7 +134,7 @@ export default function AuthGateway({ onSuccess }: AuthGatewayProps) {
             type="button"
             onClick={() => { setActiveTab('signin'); setErrorMsg(null); }}
             className={`flex-1 relative z-10 py-1.5 text-[11px] font-bold text-center transition-colors duration-200 cursor-pointer ${
-              activeTab === 'signin' ? 'text-stone-900' : 'text-stone-400'
+              activeTab === 'signin' ? 'text-primary' : 'text-secondary/60'
             }`}
           >
             Sign in
@@ -143,7 +143,7 @@ export default function AuthGateway({ onSuccess }: AuthGatewayProps) {
             type="button"
             onClick={() => { setActiveTab('signup'); setErrorMsg(null); }}
             className={`flex-1 relative z-10 py-1.5 text-[11px] font-bold text-center transition-colors duration-200 cursor-pointer ${
-              activeTab === 'signup' ? 'text-stone-900' : 'text-stone-400'
+              activeTab === 'signup' ? 'text-primary' : 'text-secondary/60'
             }`}
           >
             Sign up
@@ -160,59 +160,59 @@ export default function AuthGateway({ onSuccess }: AuthGatewayProps) {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.15 }}
               >
-                <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block ml-1">Full Name</label>
+                <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block ml-1">Full Name</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Jian Medina"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full h-9.5 px-3 bg-stone-50 rounded-xl border border-stone-200/60 text-xs text-stone-900 placeholder:text-stone-400 focus:outline-none focus:bg-white focus:border-sky-300 focus:ring-1 focus:ring-sky-200 transition-all font-medium"
+                  className="w-full h-9.5 px-3 bg-canvas rounded-xl border border-border-main/20 text-xs text-primary placeholder:text-secondary/40 focus:outline-none focus:bg-canvas focus:border-brand transition-all font-medium"
                 />
               </motion.div>
             )}
           </AnimatePresence>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block ml-1">Username</label>
+            <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block ml-1">Username</label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary/60" />
               <input
                 type="text"
                 required
                 placeholder="e.g. jianm"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full h-9.5 pl-9 pr-3 bg-stone-50 rounded-xl border border-stone-200/60 text-xs text-stone-900 placeholder:text-stone-400 focus:outline-none focus:bg-white focus:border-sky-300 focus:ring-1 focus:ring-sky-200 transition-all font-medium"
+                className="w-full h-9.5 pl-9 pr-3 bg-canvas rounded-xl border border-border-main/20 text-xs text-primary placeholder:text-secondary/40 focus:outline-none focus:bg-canvas focus:border-brand transition-all font-medium"
               />
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block ml-1">Password</label>
+            <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block ml-1">Password</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary/60" />
               <input
                 type="password"
                 required
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full h-9.5 pl-9 pr-3 bg-stone-50 rounded-xl border border-stone-200/60 text-xs text-stone-900 placeholder:text-stone-400 focus:outline-none focus:bg-white focus:border-sky-300 focus:ring-1 focus:ring-sky-200 transition-all font-medium"
+                className="w-full h-9.5 pl-9 pr-3 bg-canvas rounded-xl border border-border-main/20 text-xs text-primary placeholder:text-secondary/40 focus:outline-none focus:bg-canvas focus:border-brand transition-all font-medium"
               />
             </div>
           </div>
 
           {/* Feedback messages */}
           {errorMsg && (
-            <div className="p-2.5 bg-rose-50 border border-rose-100 rounded-xl flex items-start gap-2 text-[10px] text-rose-600 font-medium">
+            <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-2 text-[10px] text-rose-500 font-medium animate-shake">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{errorMsg}</span>
             </div>
           )}
 
           {successMsg && (
-            <div className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-xl flex items-start gap-2 text-[10px] text-emerald-600 font-medium">
+            <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-start gap-2 text-[10px] text-emerald-500 font-medium">
               <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{successMsg}</span>
             </div>
@@ -221,10 +221,10 @@ export default function AuthGateway({ onSuccess }: AuthGatewayProps) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-10 rounded-xl bg-stone-900 hover:bg-stone-800 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            className="w-full h-10 rounded-xl bg-brand hover:brightness-95 text-brand-foreground font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             {loading ? (
-              <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              <div className="w-4 h-4 rounded-full border-2 border-brand-foreground/30 border-t-brand-foreground animate-spin" />
             ) : activeTab === 'signin' ? (
               <>
                 <LogIn className="w-3.5 h-3.5" />
