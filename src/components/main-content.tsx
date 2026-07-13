@@ -13,6 +13,7 @@ import type { SubNavTab } from '@/hooks/use-sub-nav';
 import { supabase } from '@/lib/supabase';
 import OutfitBuilder from '@/components/modals/outfit-builder';
 import DashboardView from '@/components/views/dashboard-view';
+import CustomSelect from '@/components/ui/custom-select';
 
 interface MainContentProps {
   activeView: ViewId;
@@ -511,32 +512,30 @@ function TodoListView({ spaces }: { spaces: Space[] }) {
             </button>
           </div>
 
-          <div className="flex flex-wrap gap-3 items-center text-xs">
-            <div className="flex items-center gap-1.5">
-              <span className="text-secondary font-semibold">Assign Space:</span>
-              <select
+          <div className="flex flex-wrap gap-4 items-center text-xs">
+            <div className="flex items-center gap-1.5 w-44">
+              <span className="text-secondary font-semibold shrink-0">Space:</span>
+              <CustomSelect
+                options={[
+                  { value: 'dashboard', label: 'Global (No Space)' },
+                  ...spaces.map(s => ({ value: s.id, label: s.name }))
+                ]}
                 value={todoSpace}
-                onChange={(e) => setTodoSpace(e.target.value)}
-                className="h-7 px-2.5 rounded-full bg-canvas border border-border-main/30 text-xs text-primary focus:outline-none focus:border-sky-300"
-              >
-                <option value="dashboard">Global (No Space)</option>
-                {spaces.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+                onChange={setTodoSpace}
+              />
             </div>
 
-            <div className="flex items-center gap-1.5">
-              <span className="text-secondary font-semibold">Priority:</span>
-              <select
+            <div className="flex items-center gap-1.5 w-32">
+              <span className="text-secondary font-semibold shrink-0">Priority:</span>
+              <CustomSelect
+                options={[
+                  { value: 'Low', label: 'Low' },
+                  { value: 'Medium', label: 'Medium' },
+                  { value: 'High', label: 'High' }
+                ]}
                 value={todoPriority}
-                onChange={(e) => setTodoPriority(e.target.value)}
-                className="h-7 px-2.5 rounded-full bg-canvas border border-border-main/30 text-xs text-primary focus:outline-none focus:border-sky-300"
-              >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-              </select>
+                onChange={setTodoPriority}
+              />
             </div>
           </div>
         </form>

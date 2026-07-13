@@ -15,6 +15,7 @@ import {
   resolveStorageSelectionPath,
 } from '@/data/types';
 import { uploadImageToStorage } from '@/lib/supabase';
+import CustomSelect from '@/components/ui/custom-select';
 
 interface AddAssetModalProps {
   isOpen: boolean;
@@ -49,6 +50,7 @@ export default function AddAssetModal({
   // Generalized category & specifications states
   const [selectedCategory, setSelectedCategory] = useState('Clothing');
   const [clothingType, setClothingType] = useState<ClothingCategory>('Tops');
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [customCategory, setCustomCategory] = useState('');
   const [subCategory, setSubCategory] = useState('');
   const [size, setSize] = useState('');
@@ -57,10 +59,10 @@ export default function AddAssetModal({
   const [brand, setBrand] = useState('');
 
   // Computed values
-  const itemType: ItemType = selectedCategory === 'Clothing' ? 'clothing' : 'item-accessory';
-  const category = selectedCategory === 'Clothing'
-    ? clothingType
-    : (selectedCategory === '(Add Custom Category)' ? customCategory.trim() : selectedCategory);
+  const itemType: ItemType = (!isCustomCategory && selectedCategory === 'Clothing') ? 'clothing' : 'item-accessory';
+  const category = isCustomCategory
+    ? customCategory.trim()
+    : (selectedCategory === 'Clothing' ? clothingType : selectedCategory);
 
   // Storage selection hierarchy states
   const [selectedParentId, setSelectedParentId] = useState<string>('');
@@ -242,6 +244,7 @@ export default function AddAssetModal({
     setIsRemovingBg(false);
     setSelectedCategory('Clothing');
     setClothingType('Tops');
+    setIsCustomCategory(false);
     setCustomCategory('');
     setSubCategory('');
     setSize('');
@@ -301,52 +304,36 @@ export default function AddAssetModal({
               {/* Dynamic Hierarchical Storage Dropdowns */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {/* Parent Storage */}
-                <div className="space-y-1.5">
-                  <label className="font-bold text-secondary">Parent Storage *</label>
-                  <select
-                    value={selectedParentId}
-                    onChange={(e) => setSelectedParentId(e.target.value)}
-                    className="w-full h-9 px-2 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-medium"
-                  >
-                    <option value="" disabled>Select Storage</option>
-                    {activeSpaceStorages.map(node => (
-                      <option key={node.id} value={node.id}>{node.name}</option>
-                    ))}
-                  </select>
-                </div>
+                <CustomSelect
+                  label="Parent Storage *"
+                  placeholder="Select Storage"
+                  options={activeSpaceStorages.map(node => ({ value: node.id, label: node.name }))}
+                  value={selectedParentId}
+                  onChange={setSelectedParentId}
+                />
 
                 {/* Child Container */}
                 {selectedParentNode && selectedParentNode.children && selectedParentNode.children.length > 0 ? (
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-secondary">Child Container</label>
-                    <select
-                      value={selectedChildId}
-                      onChange={(e) => setSelectedChildId(e.target.value)}
-                      className="w-full h-9 px-2 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-medium"
-                    >
-                      {selectedParentNode.children.map(node => (
-                        <option key={node.id} value={node.id}>{node.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <CustomSelect
+                    label="Child Container"
+                    placeholder="Select Container"
+                    options={selectedParentNode.children.map(node => ({ value: node.id, label: node.name }))}
+                    value={selectedChildId}
+                    onChange={setSelectedChildId}
+                  />
                 ) : (
                   <div className="hidden sm:block" />
                 )}
 
                 {/* Compartment */}
                 {selectedChildNode && selectedChildNode.children && selectedChildNode.children.length > 0 ? (
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-secondary">Compartment</label>
-                    <select
-                      value={selectedCompartmentId}
-                      onChange={(e) => setSelectedCompartmentId(e.target.value)}
-                      className="w-full h-9 px-2 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-medium"
-                    >
-                      {selectedChildNode.children.map(node => (
-                        <option key={node.id} value={node.id}>{node.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <CustomSelect
+                    label="Compartment"
+                    placeholder="Select Compartment"
+                    options={selectedChildNode.children.map(node => ({ value: node.id, label: node.name }))}
+                    value={selectedCompartmentId}
+                    onChange={setSelectedCompartmentId}
+                  />
                 ) : (
                   <div className="hidden sm:block" />
                 )}
@@ -356,26 +343,64 @@ export default function AddAssetModal({
               <div className="p-4 bg-canvas/25 rounded-2xl border border-border-main/15 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Category Selection */}
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-secondary">Category *</label>
-                    <select
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="w-full h-9 px-2 bg-card rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-semibold"
-                    >
-                      <option value="Clothing">Clothing</option>
-                      <option value="Item">Item</option>
-                      <option value="Accessory">Accessory</option>
-                      <option value="Skin Care">Skin Care</option>
-                      <option value="Make Up">Make Up</option>
-                      <option value="Tools">Tools</option>
-                      <option value="(Add Custom Category)">(Add Custom Category)</option>
-                    </select>
-                  </div>
+                  {isCustomCategory ? (
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-secondary text-[11px] uppercase tracking-wider">Custom Category Name *</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Board Games, Books"
+                          value={customCategory}
+                          onChange={(e) => setCustomCategory(e.target.value)}
+                          className="w-full h-9 px-3 bg-card rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-semibold"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsCustomCategory(false);
+                            setCustomCategory('');
+                          }}
+                          className="h-9 px-3 bg-canvas border border-border-main/20 hover:bg-canvas/80 text-secondary rounded-xl font-bold flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                          title="Revert to presets"
+                        >
+                          <X className="w-4.5 h-4.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 flex flex-col justify-end">
+                      <div className="flex items-end gap-2">
+                        <div className="flex-1">
+                          <CustomSelect
+                            label="Category *"
+                            options={[
+                              { value: 'Clothing', label: 'Clothing' },
+                              { value: 'Item', label: 'Item' },
+                              { value: 'Accessory', label: 'Accessory' },
+                              { value: 'Skin Care', label: 'Skin Care' },
+                              { value: 'Make Up', label: 'Make Up' },
+                              { value: 'Tools', label: 'Tools' },
+                            ]}
+                            value={selectedCategory}
+                            onChange={setSelectedCategory}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsCustomCategory(true)}
+                          className="h-9 px-3 bg-brand/10 border border-brand/20 hover:bg-brand/20 text-brand rounded-xl font-bold flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                          title="Add Custom Category"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Sub-Category Input */}
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-secondary">Sub-Category</label>
+                  <div className="space-y-1.5 flex flex-col justify-end">
+                    <label className="font-bold text-secondary text-[11px] uppercase tracking-wider">Sub-Category</label>
                     <input
                       type="text"
                       placeholder="e.g. T-Shirt, Jeans, Charger"
@@ -386,39 +411,16 @@ export default function AddAssetModal({
                   </div>
                 </div>
 
-                {/* Conditional Inputs stacked below Category */}
-                {(selectedCategory === '(Add Custom Category)' || selectedCategory === 'Clothing') && (
+                {/* Clothing Type select (only shown if isCustomCategory is false and Category is Clothing) */}
+                {!isCustomCategory && selectedCategory === 'Clothing' && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    {/* Custom Category Input */}
-                    {selectedCategory === '(Add Custom Category)' && (
-                      <div className="space-y-1.5 col-span-full">
-                        <label className="font-bold text-secondary">Custom Category Name *</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Board Games, Books"
-                          value={customCategory}
-                          onChange={(e) => setCustomCategory(e.target.value)}
-                          className="w-full h-9 px-3 bg-card rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-semibold"
-                        />
-                      </div>
-                    )}
-
-                    {/* Clothing Type Select */}
-                    {selectedCategory === 'Clothing' && (
-                      <div className="space-y-1.5 col-span-full">
-                        <label className="font-bold text-secondary">Clothing Type *</label>
-                        <select
-                          value={clothingType}
-                          onChange={(e) => setClothingType(e.target.value as ClothingCategory)}
-                          className="w-full h-9 px-2 bg-card rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-semibold"
-                        >
-                          {CLOTHING_CATEGORIES.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
+                    <CustomSelect
+                      label="Clothing Type *"
+                      options={CLOTHING_CATEGORIES.map(cat => ({ value: cat, label: cat }))}
+                      value={clothingType}
+                      onChange={(val) => setClothingType(val as ClothingCategory)}
+                      className="col-span-full"
+                    />
                   </div>
                 )}
               </div>

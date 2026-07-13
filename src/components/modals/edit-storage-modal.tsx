@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Image as ImageIcon, Trash2, Save, AlertTriangle } from 'lucide-react';
 import { StorageUnit, StorageType, STORAGE_TYPES } from '@/data/types';
 import { uploadImageToStorage } from '@/lib/supabase';
+import CustomSelect from '@/components/ui/custom-select';
 
 interface EditStorageModalProps {
   isOpen: boolean;
@@ -172,20 +173,12 @@ export default function EditStorageModal({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Type */}
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-secondary">Storage Type *</label>
-                    <select
-                      value={type}
-                      onChange={(e) => setType(e.target.value as StorageType)}
-                      className="w-full h-9 px-2 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-canvas focus:border-brand text-xs font-semibold"
-                    >
-                      {STORAGE_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <CustomSelect
+                    label="Storage Type *"
+                    options={STORAGE_TYPES.map((t) => ({ value: t, label: t }))}
+                    value={type}
+                    onChange={(val) => setType(val as StorageType)}
+                  />
 
                   {/* Max Capacity */}
                   <div className="space-y-1.5">

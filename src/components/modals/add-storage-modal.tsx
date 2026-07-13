@@ -12,6 +12,7 @@ import {
   getEligibleParentStorages,
 } from '@/data/types';
 import { uploadImageToStorage } from '@/lib/supabase';
+import CustomSelect from '@/components/ui/custom-select';
 
 interface AddStorageModalProps {
   isOpen: boolean;
@@ -251,37 +252,27 @@ export default function AddStorageModal({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Storage Type */}
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-secondary">Storage Type *</label>
-                      <select
-                        value={type}
-                        onChange={(e) => setType(e.target.value as StorageType)}
-                        className="w-full h-9 px-2 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-canvas focus:border-brand text-xs font-semibold"
-                      >
-                        {STORAGE_TYPES.map((t) => (
-                          <option key={t} value={t}>
-                            {t} {TOP_LEVEL_STORAGE_TYPES.includes(t) ? ' (Top-Level)' : ' (Nested)'}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <CustomSelect
+                      label="Storage Type *"
+                      options={STORAGE_TYPES.map((t) => ({
+                        value: t,
+                        label: `${t}${TOP_LEVEL_STORAGE_TYPES.includes(t) ? ' (Top-Level)' : ' (Nested)'}`
+                      }))}
+                      value={type}
+                      onChange={(val) => setType(val as StorageType)}
+                    />
 
                     {/* Space Selection (only if activeSpaceId is null) */}
                     {!activeSpaceId && spaces.length > 0 && (
-                      <div className="space-y-1.5">
-                        <label className="font-bold text-secondary">Space Location *</label>
-                        <select
-                          value={selectedSpaceId}
-                          onChange={(e) => setSelectedSpaceId(e.target.value)}
-                          className="w-full h-9 px-2 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-canvas focus:border-brand text-xs font-semibold"
-                        >
-                          {spaces.map((sp) => (
-                            <option key={sp.id} value={sp.id}>
-                              {sp.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      <CustomSelect
+                        label="Space Location *"
+                        options={spaces.map((sp) => ({
+                          value: sp.id,
+                          label: sp.name
+                        }))}
+                        value={selectedSpaceId}
+                        onChange={setSelectedSpaceId}
+                      />
                     )}
                   </div>
 
@@ -336,26 +327,16 @@ export default function AddStorageModal({
                   {requiresParent ? (
                     <div className="space-y-4">
                       {/* Parent Selector */}
-                      <div className="space-y-1.5">
-                        <label className="font-bold text-secondary">
-                          Parent {type === 'Compartment' ? 'Container' : 'Storage Unit'} *
-                        </label>
-                        <select
-                          value={parentId}
-                          onChange={(e) => setParentId(e.target.value)}
-                          required
-                          className="w-full h-9 px-2 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-canvas focus:border-brand text-xs font-semibold"
-                        >
-                          <option value="" disabled>
-                            {potentialParents.length === 0 ? 'No eligible parent structures' : 'Select parent storage'}
-                          </option>
-                          {potentialParents.map((parent) => (
-                            <option key={parent.id} value={parent.id}>
-                              {parent.name} ({parent.type})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      <CustomSelect
+                        label={`Parent ${type === 'Compartment' ? 'Container' : 'Storage Unit'} *`}
+                        placeholder={potentialParents.length === 0 ? 'No eligible parent structures' : 'Select parent storage'}
+                        options={potentialParents.map(parent => ({
+                          value: parent.id,
+                          label: `${parent.name} (${parent.type})`
+                        }))}
+                        value={parentId}
+                        onChange={setParentId}
+                      />
 
                       {/* Compartment capacity input */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
