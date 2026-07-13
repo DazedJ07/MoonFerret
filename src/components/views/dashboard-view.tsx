@@ -271,7 +271,8 @@ export default function DashboardView({
 
     itemsInStorage.forEach(item => {
       if (item.itemType === 'clothing' && item.category) {
-        counts[item.category] = (counts[item.category] || 0) + 1;
+        const catKey = item.category as CategoryFilter;
+        counts[catKey] = (counts[catKey] || 0) + 1;
       } else if (item.itemType === 'item-accessory') {
         counts.Accessories = (counts.Accessories || 0) + 1;
       }

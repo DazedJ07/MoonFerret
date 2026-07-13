@@ -33,7 +33,6 @@ export default function AddAssetModal({
   activeSpaceId,
   defaultContainerId,
 }: AddAssetModalProps) {
-  const [itemType, setItemType] = useState<ItemType>('clothing');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -47,13 +46,21 @@ export default function AddAssetModal({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
 
-  // Clothing specific states
-  const [category, setCategory] = useState<ClothingCategory>('Tops');
+  // Generalized category & specifications states
+  const [selectedCategory, setSelectedCategory] = useState('Clothing');
+  const [clothingType, setClothingType] = useState<ClothingCategory>('Tops');
+  const [customCategory, setCustomCategory] = useState('');
   const [subCategory, setSubCategory] = useState('');
   const [size, setSize] = useState('');
   const [color, setColor] = useState('');
   const [material, setMaterial] = useState('');
   const [brand, setBrand] = useState('');
+
+  // Computed values
+  const itemType: ItemType = selectedCategory === 'Clothing' ? 'clothing' : 'item-accessory';
+  const category = selectedCategory === 'Clothing'
+    ? clothingType
+    : (selectedCategory === '(Add Custom Category)' ? customCategory.trim() : selectedCategory);
 
   // Storage selection hierarchy states
   const [selectedParentId, setSelectedParentId] = useState<string>('');
@@ -202,7 +209,7 @@ export default function AddAssetModal({
       ? `${imageUrl.split('#')[0]}#${imageFit}`
       : undefined;
 
-    const baseItem = {
+    const finalItem = {
       containerId: targetContainerId,
       name: name.trim(),
       description: description.trim(),
@@ -211,17 +218,13 @@ export default function AddAssetModal({
       condition,
       isSpare,
       itemType,
-    };
-
-    const finalItem = itemType === 'clothing' ? {
-      ...baseItem,
-      category,
+      category: category || undefined,
       subCategory: subCategory.trim() || undefined,
       size: size.trim() || undefined,
       color: color.trim() || undefined,
       material: material.trim() || undefined,
       brand: brand.trim() || undefined,
-    } : baseItem;
+    };
 
     onSubmit(finalItem);
     handleReset();
@@ -237,7 +240,9 @@ export default function AddAssetModal({
     setSelectedFile(null);
     setImageFit('cover');
     setIsRemovingBg(false);
-    setCategory('Tops');
+    setSelectedCategory('Clothing');
+    setClothingType('Tops');
+    setCustomCategory('');
     setSubCategory('');
     setSize('');
     setColor('');
@@ -278,51 +283,7 @@ export default function AddAssetModal({
               >
                 <X className="w-4 h-4" />
               </button>
-            </div>
-
-            {/* Poly-classification Segmented Control */}
-            <div className="p-1 bg-canvas rounded-xl flex gap-1">
-              <button
-                type="button"
-                onClick={() => setItemType('clothing')}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all relative ${
-                  itemType === 'clothing' ? 'text-primary' : 'text-secondary hover:text-primary'
-                }`}
-              >
-                {itemType === 'clothing' && (
-                  <motion.div
-                    layoutId="itemTypeActive"
-                    className="absolute inset-0 bg-card rounded-lg shadow-sm border border-border-main/5"
-                    transition={{ type: 'spring', stiffness: 450, damping: 30 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center justify-center gap-1">
-                  <Sparkles className="w-3 h-3 text-brand" />
-                  Clothing Item
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setItemType('item-accessory')}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all relative ${
-                  itemType === 'item-accessory' ? 'text-primary' : 'text-secondary hover:text-primary'
-                }`}
-              >
-                {itemType === 'item-accessory' && (
-                  <motion.div
-                    layoutId="itemTypeActive"
-                    className="absolute inset-0 bg-card rounded-lg shadow-sm border border-border-main/5"
-                    transition={{ type: 'spring', stiffness: 450, damping: 30 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center justify-center gap-1">
-                  <Folder className="w-3.5 h-3.5 text-secondary" />
-                  Item / Accessory
-                </span>
-              </button>
-            </div>
-
-            {/* Form */}
+            </div>            {/* Form */}
             <form onSubmit={handleSave} className="space-y-4 text-xs">
               {/* Name */}
               <div className="space-y-1.5">
@@ -391,78 +352,125 @@ export default function AddAssetModal({
                 )}
               </div>
 
-              {/* Clothing-Specific Fields */}
-              {itemType === 'clothing' && (
-                <div className="space-y-4 p-3 bg-canvas/20 rounded-xl border border-border-main/10">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-secondary">Category *</label>
-                      <select
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value as ClothingCategory)}
-                        className="w-full h-9 px-2 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-medium"
-                      >
-                        {CLOTHING_CATEGORIES.map(cat => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-secondary">Sub-Category</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. T-Shirt, Jeans"
-                        value={subCategory}
-                        onChange={(e) => setSubCategory(e.target.value)}
-                        className="w-full h-9 px-3 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-sm font-medium"
-                      />
-                    </div>
+              {/* Category & Sub-Category Section */}
+              <div className="p-4 bg-canvas/25 rounded-2xl border border-border-main/15 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Category Selection */}
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-secondary">Category *</label>
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="w-full h-9 px-2 bg-card rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-semibold"
+                    >
+                      <option value="Clothing">Clothing</option>
+                      <option value="Item">Item</option>
+                      <option value="Accessory">Accessory</option>
+                      <option value="Skin Care">Skin Care</option>
+                      <option value="Make Up">Make Up</option>
+                      <option value="Tools">Tools</option>
+                      <option value="(Add Custom Category)">(Add Custom Category)</option>
+                    </select>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-secondary">Size</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. M, 10"
-                        value={size}
-                        onChange={(e) => setSize(e.target.value)}
-                        className="w-full h-9 px-2 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-medium"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-secondary">Color</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Black"
-                        value={color}
-                        onChange={(e) => setColor(e.target.value)}
-                        className="w-full h-9 px-2 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-medium"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-secondary">Material</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Cotton"
-                        value={material}
-                        onChange={(e) => setMaterial(e.target.value)}
-                        className="w-full h-9 px-2 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-medium"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-secondary">Brand</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Zara"
-                        value={brand}
-                        onChange={(e) => setBrand(e.target.value)}
-                        className="w-full h-9 px-2 bg-canvas/30 rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-medium"
-                      />
-                    </div>
+                  {/* Sub-Category Input */}
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-secondary">Sub-Category</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. T-Shirt, Jeans, Charger"
+                      value={subCategory}
+                      onChange={(e) => setSubCategory(e.target.value)}
+                      className="w-full h-9 px-3 bg-card rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-semibold"
+                    />
                   </div>
                 </div>
-              )}
+
+                {/* Conditional Inputs stacked below Category */}
+                {(selectedCategory === '(Add Custom Category)' || selectedCategory === 'Clothing') && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    {/* Custom Category Input */}
+                    {selectedCategory === '(Add Custom Category)' && (
+                      <div className="space-y-1.5 col-span-full">
+                        <label className="font-bold text-secondary">Custom Category Name *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Board Games, Books"
+                          value={customCategory}
+                          onChange={(e) => setCustomCategory(e.target.value)}
+                          className="w-full h-9 px-3 bg-card rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-semibold"
+                        />
+                      </div>
+                    )}
+
+                    {/* Clothing Type Select */}
+                    {selectedCategory === 'Clothing' && (
+                      <div className="space-y-1.5 col-span-full">
+                        <label className="font-bold text-secondary">Clothing Type *</label>
+                        <select
+                          value={clothingType}
+                          onChange={(e) => setClothingType(e.target.value as ClothingCategory)}
+                          className="w-full h-9 px-2 bg-card rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-semibold"
+                        >
+                          {CLOTHING_CATEGORIES.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Product Specifications Section */}
+              <div className="p-4 bg-canvas/25 rounded-2xl border border-border-main/15 space-y-3">
+                <h4 className="font-bold text-secondary uppercase text-[10px] tracking-wider border-b border-border-main/15 pb-1">
+                  Product Specifications (Optional)
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-[10px] text-secondary">Size</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. M, 10"
+                      value={size}
+                      onChange={(e) => setSize(e.target.value)}
+                      className="w-full h-9 px-2 bg-card rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-medium"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-[10px] text-secondary">Color</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Black"
+                      value={color}
+                      onChange={(e) => setColor(e.target.value)}
+                      className="w-full h-9 px-2 bg-card rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-medium"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-[10px] text-secondary">Material</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Cotton"
+                      value={material}
+                      onChange={(e) => setMaterial(e.target.value)}
+                      className="w-full h-9 px-2 bg-card rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-medium"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-[10px] text-secondary">Brand</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Zara"
+                      value={brand}
+                      onChange={(e) => setBrand(e.target.value)}
+                      className="w-full h-9 px-2 bg-card rounded-xl border border-border-main/40 focus:outline-none focus:bg-white focus:border-brand text-xs font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
 
               {/* Description */}
               <div className="space-y-1.5">

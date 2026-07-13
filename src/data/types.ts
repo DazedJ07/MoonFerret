@@ -76,7 +76,7 @@ export interface IndividualItem {
   isSpare: boolean;
   itemType: ItemType;
   // Clothing-specific fields (only relevant when itemType === 'clothing')
-  category?: ClothingCategory;
+  category?: string;
   subCategory?: string;         // e.g. 'T-Shirt', 'Jeans', 'Sneakers'
   size?: string;                // e.g. 'M', 'L', '42'
   color?: string;
