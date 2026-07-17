@@ -60,9 +60,12 @@ export default function AddAssetModal({
 
   // Computed values
   const itemType: ItemType = (!isCustomCategory && selectedCategory === 'Clothing') ? 'clothing' : 'item-accessory';
-  const category = isCustomCategory
+  const categoryValue = isCustomCategory
     ? customCategory.trim()
-    : (selectedCategory === 'Clothing' ? clothingType : selectedCategory);
+    : (selectedCategory === 'Clothing' ? 'Clothing' : selectedCategory);
+  const subCategoryValue = (!isCustomCategory && selectedCategory === 'Clothing')
+    ? clothingType
+    : subCategory.trim();
 
   // Storage selection hierarchy states
   const [selectedParentId, setSelectedParentId] = useState<string>('');
@@ -220,8 +223,8 @@ export default function AddAssetModal({
       condition,
       isSpare,
       itemType,
-      category: category || undefined,
-      subCategory: subCategory.trim() || undefined,
+      category: categoryValue || undefined,
+      subCategory: subCategoryValue || undefined,
       size: size.trim() || undefined,
       color: color.trim() || undefined,
       material: material.trim() || undefined,

@@ -7,9 +7,10 @@ import {
   Space, 
   StorageUnit, 
   IndividualItem, 
-  CategoryFilter, 
   ItemCondition, 
   StorageType,
+  CLOTHING_CATEGORIES,
+  ClothingCategory,
   buildStorageTree,
   getDescendantIds,
   buildChildStorageUnits,
@@ -85,7 +86,8 @@ export default function DashboardView({
 }: DashboardViewProps) {
   const [selectedStorageId, setSelectedStorageId] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<CategoryFilter>('All');
+  const [activeFilter, setActiveFilter] = useState<string>('All');
+  const [activeSubFilter, setActiveSubFilter] = useState<string>('All');
 
   // Animated greetings
   const [randomGreetingTag, setRandomGreetingTag] = useState('');
@@ -108,6 +110,10 @@ export default function DashboardView({
     const idx = Math.floor(Math.random() * greetingTags.length);
     setRandomGreetingTag(greetingTags[idx]);
   }, []);
+  const handleFilterChange = (filter: string) => {
+    setActiveFilter(filter);
+    setActiveSubFilter('All');
+  };
 
   const getGreetingHeader = () => {
     const hour = new Date().getHours();
@@ -232,14 +238,31 @@ export default function DashboardView({
     return storageUnitsList.find(su => su.id === selectedStorageId) || null;
   }, [storageUnitsList, selectedStorageId]);
 
+  // Get flat list of items in the selected storage
+  const itemsInStorage = useMemo(() => {
+    if (!selectedStorageId) return [];
+    return individualItemsList.filter(item => item.containerId === selectedStorageId);
+  }, [individualItemsList, selectedStorageId]);
+
+  // Extract dynamic categories from items in active storage
+  const dynamicCategories = useMemo(() => {
+    if (!selectedStorageId) return [];
+    const cats = new Set<string>();
+    itemsInStorage.forEach(item => {
+      if (item.category) {
+        cats.add(item.category);
+      } else {
+        cats.add('Accessory');
+      }
+    });
+    return Array.from(cats);
+  }, [itemsInStorage]);
+
   // Filter individual items stored inside the active target storage unit and search query + category filters
   const activeItems = useMemo(() => {
     if (!selectedStorageId) return [];
 
-    return individualItemsList.filter(item => {
-      // Must be inside the selected storage unit
-      if (item.containerId !== selectedStorageId) return false;
-
+    return itemsInStorage.filter(item => {
       // Search Query filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -251,35 +274,45 @@ export default function DashboardView({
 
       // Category filter
       if (activeFilter === 'All') return true;
-      if (item.itemType === 'clothing') {
-        return item.category === activeFilter;
+
+      const itemCat = item.category || 'Accessory';
+      if (itemCat !== activeFilter) return false;
+
+      // Sub-category filter for clothes
+      if (activeFilter === 'Clothing' && activeSubFilter !== 'All') {
+        return item.subCategory === activeSubFilter;
       }
-      if (item.itemType === 'item-accessory' && activeFilter === 'Accessories') {
-        return true;
-      }
-      return false;
+
+      return true;
     });
-  }, [individualItemsList, selectedStorageId, searchQuery, activeFilter]);
+  }, [itemsInStorage, searchQuery, activeFilter, activeSubFilter]);
 
   // Compute category count mapping for filter badges
   const categoryCounts = useMemo(() => {
-    const counts: Partial<Record<CategoryFilter, number>> = { All: 0 };
-    if (!selectedStorageId) return counts;
-
-    const itemsInStorage = individualItemsList.filter(item => item.containerId === selectedStorageId);
-    counts.All = itemsInStorage.length;
-
+    const counts: Record<string, number> = { All: itemsInStorage.length };
+    dynamicCategories.forEach(cat => {
+      counts[cat] = 0;
+    });
     itemsInStorage.forEach(item => {
-      if (item.itemType === 'clothing' && item.category) {
-        const catKey = item.category as CategoryFilter;
-        counts[catKey] = (counts[catKey] || 0) + 1;
-      } else if (item.itemType === 'item-accessory') {
-        counts.Accessories = (counts.Accessories || 0) + 1;
+      const cat = item.category || 'Accessory';
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    return counts;
+  }, [itemsInStorage, dynamicCategories]);
+
+  // Compute clothing type subcategory counts
+  const subCategoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { All: categoryCounts['Clothing'] || 0 };
+    CLOTHING_CATEGORIES.forEach(sc => {
+      counts[sc] = 0;
+    });
+    itemsInStorage.forEach(item => {
+      if (item.category === 'Clothing' && item.subCategory) {
+        counts[item.subCategory] = (counts[item.subCategory] || 0) + 1;
       }
     });
-
     return counts;
-  }, [individualItemsList, selectedStorageId]);
+  }, [itemsInStorage, categoryCounts]);
 
   // Scoped metrics summary
   const activeSpaceContainers = useMemo(() => {
@@ -611,6 +644,72 @@ export default function DashboardView({
     }
   };
 
+  // CRUD: Update Item details
+  const handleUpdateItem = async (itemId: string, updatedFields: Partial<IndividualItem>) => {
+    const item = individualItemsList.find(i => i.id === itemId);
+    if (!item) return;
+
+    // Calculate quantity change for storage counts
+    const quantityDiff = (updatedFields.quantity ?? item.quantity) - item.quantity;
+
+    // Update item locally
+    setIndividualItemsList(prev => prev.map(i => {
+      if (i.id === itemId) {
+        return { ...i, ...updatedFields };
+      }
+      return i;
+    }));
+
+    // Update local storage unit item count if quantity changed
+    if (quantityDiff !== 0) {
+      setStorageUnitsList(prev => prev.map(unit => {
+        if (unit.id === item.containerId) {
+          const nextTotal = Math.max(0, unit.totalItems + quantityDiff);
+          return {
+            ...unit,
+            totalItems: nextTotal,
+            status: nextTotal >= unit.capacity ? 'full' : nextTotal > 0 ? 'has-spares' : 'empty'
+          };
+        }
+        return unit;
+      }));
+    }
+
+    if (userId) {
+      try {
+        const { error: updateError } = await supabase.from('items').update({
+          name: updatedFields.name,
+          description: updatedFields.description,
+          image_url: updatedFields.imageUrl,
+          quantity: updatedFields.quantity,
+          condition: updatedFields.condition,
+          is_spare: updatedFields.isSpare,
+          item_type: updatedFields.itemType,
+          category: updatedFields.category,
+          sub_category: updatedFields.subCategory,
+          size: updatedFields.size,
+          color: updatedFields.color,
+          material: updatedFields.material,
+          brand: updatedFields.brand,
+        }).eq('id', itemId).eq('user_id', userId);
+        if (updateError) throw updateError;
+
+        if (quantityDiff !== 0) {
+          const parentStorage = storageUnitsList.find(su => su.id === item.containerId);
+          if (parentStorage) {
+            const nextTotal = Math.max(0, parentStorage.totalItems + quantityDiff);
+            await supabase.from('storages').update({
+              total_items: nextTotal,
+              status: nextTotal >= parentStorage.capacity ? 'full' : nextTotal > 0 ? 'has-spares' : 'empty'
+            }).eq('id', item.containerId).eq('user_id', userId);
+          }
+        }
+      } catch (err) {
+        console.error('Supabase update item fail:', err);
+      }
+    }
+  };
+
   return (
     <div className="space-y-6 min-w-0">
       {/* View Header */}
@@ -828,12 +927,27 @@ export default function DashboardView({
             </div>
 
             {/* Category filter pills */}
-            <div className="flex justify-start">
-              <PillFilterNav 
-                activeFilter={activeFilter} 
-                onFilterChange={setActiveFilter} 
-                counts={categoryCounts} 
-              />
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-start">
+                <PillFilterNav 
+                  filters={['All', ...dynamicCategories]}
+                  activeFilter={activeFilter} 
+                  onFilterChange={handleFilterChange} 
+                  counts={categoryCounts} 
+                />
+              </div>
+
+              {activeFilter === 'Clothing' && (
+                <div className="flex items-center gap-1.5 justify-start pl-2 animate-fade-in">
+                  <span className="text-[10px] font-bold text-secondary uppercase tracking-widest">Type:</span>
+                  <PillFilterNav 
+                    filters={['All', ...CLOTHING_CATEGORIES]}
+                    activeFilter={activeSubFilter} 
+                    onFilterChange={setActiveSubFilter} 
+                    counts={subCategoryCounts} 
+                  />
+                </div>
+              )}
             </div>
 
             {/* Items list wrapper */}
@@ -871,7 +985,7 @@ export default function DashboardView({
                         <div className="flex items-center gap-2">
                           <p className="text-xs font-bold text-primary truncate">{item.name}</p>
                           <span className="text-[8px] bg-brand/10 text-brand border border-brand/20 px-1.5 py-0.2 rounded font-extrabold uppercase tracking-wide">
-                            {item.itemType === 'clothing' ? item.category : 'Accessory'}
+                            {item.itemType === 'clothing' ? `Clothing: ${item.subCategory || 'Tops'}` : (item.category || 'Accessory')}
                           </span>
                         </div>
                         <p className="text-[10px] text-secondary mt-0.5 truncate">{item.description || 'No description added'}</p>
@@ -990,6 +1104,7 @@ export default function DashboardView({
         onClose={() => setSelectedItemId(null)}
         onDelete={handleDeleteItem}
         onQuantityAdjust={handleQuantityAdjust}
+        onSave={handleUpdateItem}
       />
 
       <EditStorageModal

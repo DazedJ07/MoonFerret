@@ -1,22 +1,23 @@
 'use client';
 
 import { motion, AnimatePresence } from 'motion/react';
-import { CategoryFilter, CATEGORY_FILTERS } from '@/data/types';
 
 interface PillFilterNavProps {
-  activeFilter: CategoryFilter;
-  onFilterChange: (filter: CategoryFilter) => void;
-  counts?: Partial<Record<CategoryFilter, number>>;
+  filters: string[];
+  activeFilter: string;
+  onFilterChange: (filter: string) => void;
+  counts?: Record<string, number>;
 }
 
 export default function PillFilterNav({
+  filters,
   activeFilter,
   onFilterChange,
   counts,
 }: PillFilterNavProps) {
   return (
     <div className="flex items-center gap-1.5 p-1 bg-card border border-border-main/30 rounded-full w-fit shadow-sm overflow-x-auto scrollbar-hide">
-      {CATEGORY_FILTERS.map((filter) => {
+      {filters.map((filter) => {
         const isActive = activeFilter === filter;
         const count = counts?.[filter];
 

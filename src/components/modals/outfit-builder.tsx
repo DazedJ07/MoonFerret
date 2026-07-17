@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Shirt, X, Image as ImageIcon, Search, Tag, Check, Trash2 } from 'lucide-react';
-import { IndividualItem, CategoryFilter, CATEGORY_FILTERS } from '@/data/types';
+import { IndividualItem } from '@/data/types';
 import { uploadImageToStorage } from '@/lib/supabase';
 
 interface OutfitBuilderProps {
@@ -23,26 +23,34 @@ export default function OutfitBuilder({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<CategoryFilter>('All');
+  const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Extract dynamic categories from allItems
+  const dynamicCategories = useMemo(() => {
+    const cats = new Set<string>();
+    allItems.forEach((item) => {
+      if (item.category) {
+        cats.add(item.category);
+      } else {
+        cats.add('Accessory');
+      }
+    });
+    return ['All', ...Array.from(cats)];
+  }, [allItems]);
 
   // Category filter + search query logic
   const filteredItems = useMemo(() => {
     return allItems.filter((item) => {
       // 1. Search filter
       const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchQuery.toLowerCase());
+        (item.description || '').toLowerCase().includes(searchQuery.toLowerCase());
       if (!matchesSearch) return false;
 
       // 2. Category filter
       if (activeFilter === 'All') return true;
-      
-      // Items that are item-accessory only display under Accessories in addition to All
-      if (item.itemType === 'item-accessory') {
-        return activeFilter === 'Accessories';
-      }
-
-      return item.category === activeFilter;
+      const itemCat = item.category || 'Accessory';
+      return itemCat === activeFilter;
     });
   }, [allItems, activeFilter, searchQuery]);
 
@@ -156,7 +164,7 @@ export default function OutfitBuilder({
 
                 {/* Inline Category Filters */}
                 <div className="flex items-center gap-1 overflow-x-auto pb-1.5 scrollbar-hide flex-shrink-0">
-                  {CATEGORY_FILTERS.map((filter) => {
+                  {dynamicCategories.map((filter) => {
                     const isActive = activeFilter === filter;
                     return (
                       <button
@@ -222,7 +230,7 @@ export default function OutfitBuilder({
                             {item.name}
                           </span>
                           <span className="text-[8px] font-extrabold text-stone-400 uppercase tracking-wider">
-                            {item.itemType === 'clothing' ? item.category : 'Accessory'}
+                            {item.itemType === 'clothing' ? `Clothing: ${item.subCategory}` : (item.category || 'Accessory')}
                           </span>
                         </div>
                       </div>
