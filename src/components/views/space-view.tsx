@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronRight, Minus, Plus } from 'lucide-react';
-import CoverflowCarousel, { type CarouselItem } from '@/components/carousel/coverflow-carousel';
+import ThreeDImageCarousel, { type CarouselItem } from '@/components/lightswind/3d-image-carousel';
 import { getSpaceById, getSpaceContainers, getSpaceStorageUnits } from '@/data/mock-data';
 import type { ViewId } from '@/hooks/use-navigation';
 
@@ -75,12 +75,10 @@ export default function SpaceView({ spaceId, counts, onIncrement, onDecrement }:
           <h2 className="text-base font-semibold text-primary">Storage Containers</h2>
           <span className="text-[10px] text-secondary uppercase tracking-widest font-semibold">{containers.length} units</span>
         </div>
-        <CoverflowCarousel
+        <ThreeDImageCarousel
           items={storageCarouselItems}
           activeIndex={activeContainerIndex}
           onChangeActiveIndex={setActiveContainerIndex}
-          onItemClick={(_id, index) => setActiveContainerIndex(index)}
-          height="h-44"
         />
       </motion.div>
 

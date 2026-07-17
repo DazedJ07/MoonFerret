@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import CoverflowCarousel, { type CarouselItem } from '@/components/carousel/coverflow-carousel';
+import ThreeDImageCarousel, { type CarouselItem } from '@/components/lightswind/3d-image-carousel';
 import { 
   Space, 
   StorageUnit, 
@@ -759,13 +759,12 @@ export default function DashboardView({
         </div>
       </div>
 
-      {/* Coverflow Carousel */}
-      <div className="w-full py-2 bg-canvas/40 rounded-3xl border border-border-main/20 p-2 shadow-inner">
-        <CoverflowCarousel
+      {/* 3D Image Carousel */}
+      <div className="w-full py-4 bg-canvas/40 rounded-3xl border border-border-main/20 p-2 shadow-inner overflow-hidden">
+        <ThreeDImageCarousel
           items={carouselItems}
           activeIndex={activeCarouselIndex}
           onChangeActiveIndex={setActiveCarouselIndex}
-          height="h-60"
         />
       </div>
 
