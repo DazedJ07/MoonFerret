@@ -59,9 +59,10 @@ const EMBEDDED_CSS = `
     top: 50%;
     left: 50%;
     transform: translateY(-50%) translateX(-50%) scale(0.3); 
-    transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); 
+    transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.8s cubic-bezier(0.25, 1, 0.5, 1), filter 0.8s ease; 
     opacity: 0;
     z-index: 1; 
+    filter: grayscale(0.8) blur(0.5px);
 }
 
 /* Slide Positioning Classes (Core 3D Logic - Cascade overlap) */
@@ -69,6 +70,7 @@ const EMBEDDED_CSS = `
     transform: translateY(-50%) translateX(-50%) scale(1);
     opacity: 1;
     z-index: 10; 
+    filter: none;
 }
 
 .cascade-slider_item.next {

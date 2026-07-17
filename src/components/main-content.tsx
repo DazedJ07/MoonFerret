@@ -653,7 +653,7 @@ export default function MainContent({
     <div className="w-full">
       <AnimatePresence mode="wait">
         <motion.div
-          key={activeTab + '-' + activeView}
+          key={activeTab}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}

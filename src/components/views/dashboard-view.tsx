@@ -132,7 +132,7 @@ export default function DashboardView({
       id: 'dashboard',
       title: 'Overall Dashboard',
       subtitle: 'Overview of all tracked items and spaces',
-      gradient: 'from-brand/20 to-brand/10',
+      gradient: 'from-sky-400/25 via-brand/20 to-violet-400/25',
       meta: 'All Spaces Summary',
     },
     ...spaces.map((s, idx) => ({
@@ -760,13 +760,11 @@ export default function DashboardView({
       </div>
 
       {/* 3D Image Carousel */}
-      <div className="w-full py-4 bg-canvas/40 rounded-3xl border border-border-main/20 p-2 shadow-inner overflow-hidden">
-        <ThreeDImageCarousel
-          items={carouselItems}
-          activeIndex={activeCarouselIndex}
-          onChangeActiveIndex={setActiveCarouselIndex}
-        />
-      </div>
+      <ThreeDImageCarousel
+        items={carouselItems}
+        activeIndex={activeCarouselIndex}
+        onChangeActiveIndex={setActiveCarouselIndex}
+      />
 
       {/* Main bottom grid and drill down workflow */}
       <div className="space-y-6">

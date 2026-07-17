@@ -39,6 +39,11 @@
    - Implemented global focused-input theme rules for selects, inputs, and textareas inside dark mode to prevent bright white flash overlaps.
    - Integrated the credential gateway [`src/components/auth-gateway.tsx`](file:///C:/Users/Jian%20Medina/Desktop/LaMoon/src/components/auth-gateway.tsx) to adapt to active color brand tints and light/dark modes cohesively.
 
+12. **Vite Migration & 3D Carousel Integration**:
+    - **Next.js to Vite Migration**: Migrated the single-page application framework from Next.js to Vite, speeding up local start-up and build times significantly.
+    - **Tailwind CSS v4 Integration**: Native integration using `@tailwindcss/vite` plugin to resolve compiled stylesheets directly within the bundle rather than relying on external PostCSS configs.
+    - **Lightswind 3D Carousel**: Integrated `ThreeDImageCarousel` under [3d-image-carousel.tsx](file:///c:/Users/Jian%20Medina/Desktop/LaMoon/src/components/lightswind/3d-image-carousel.tsx), customized to render structured room cards with overlapping 3D cascade scaling and swipe controls. Used in `dashboard-view.tsx` and `space-view.tsx`.
+
 ---
 
 ## Technical Specifications
