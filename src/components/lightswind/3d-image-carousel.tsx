@@ -36,13 +36,13 @@ const EMBEDDED_CSS = `
 
 .cascade-slider_container {
     position: relative;
-    max-width: 1100px;
+    max-width: 850px;
     margin: 0 auto;
     z-index: 20; 
     user-select: none;
     -webkit-user-select: none; 
     touch-action: pan-y;
-    height: 280px;
+    height: 340px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -51,7 +51,7 @@ const EMBEDDED_CSS = `
 .cascade-slider_slides {
     position: relative;
     width: 100%;
-    height: 240px; 
+    height: 300px; 
 }
 
 .cascade-slider_item {
@@ -74,25 +74,25 @@ const EMBEDDED_CSS = `
 }
 
 .cascade-slider_item.next {
-    transform: translateY(-50%) translateX(-120%) scale(0.75);
+    transform: translateY(-50%) translateX(-110%) scale(0.75);
     opacity: 0.65;
     z-index: 5; 
 }
 
 .cascade-slider_item.prev {
-    transform: translateY(-50%) translateX(20%) scale(0.75);
+    transform: translateY(-50%) translateX(10%) scale(0.75);
     opacity: 0.65;
     z-index: 5; 
 }
 
 .cascade-slider_item.next2 {
-    transform: translateY(-50%) translateX(-160%) scale(0.5);
+    transform: translateY(-50%) translateX(-140%) scale(0.5);
     opacity: 0.25;
     z-index: 2; 
 }
 
 .cascade-slider_item.prev2 {
-    transform: translateY(-50%) translateX(60%) scale(0.5);
+    transform: translateY(-50%) translateX(40%) scale(0.5);
     opacity: 0.25;
     z-index: 2; 
 }
@@ -112,15 +112,9 @@ const EMBEDDED_CSS = `
     transition: all 0.3s ease;
 }
 
-/* Arrow Positioning Fix (Responsive CSS) */
-@media screen and (max-width: 575px) {
-    .cascade-slider_arrow-left { left: 5px; }
-    .cascade-slider_arrow-right { right: 5px; }
-}
-@media screen and (min-width: 576px) {
-    .cascade-slider_arrow-left { left: -2%; }
-    .cascade-slider_arrow-right { right: -2%; }
-}
+/* Arrow Positioning Fix */
+.cascade-slider_arrow-left { left: 15px; }
+.cascade-slider_arrow-right { right: 15px; }
 `;
 
 // --- Helper Function: Get Slide Classes ---
@@ -146,6 +140,9 @@ export const ThreeDImageCarousel: React.FC<ThreeDImageCarouselProps> = ({
     className = '',
 }) => {
     const autoplayIntervalRef = useRef<number | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const lastScrollTimeRef = useRef(0);
+    const scrollCooldown = 400; // ms
     const total = items.length;
 
     const [isDragging, setIsDragging] = useState(false);
@@ -190,6 +187,33 @@ export const ThreeDImageCarousel: React.FC<ThreeDImageCarouselProps> = ({
         startAutoplay();
         return () => { stopAutoplay(); };
     }, [startAutoplay, stopAutoplay]);
+
+    // Native Wheel Scroll Event Listener (non-passive to allow preventDefault)
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const handleNativeWheel = (e: WheelEvent) => {
+            // Prevent main page scrolling when hovering/wheeling inside the carousel bounds
+            e.preventDefault();
+
+            const now = Date.now();
+            if (now - lastScrollTimeRef.current < scrollCooldown) return;
+
+            if (e.deltaY > 0 || e.deltaX > 0) {
+                navigate('next');
+                lastScrollTimeRef.current = now;
+            } else if (e.deltaY < 0 || e.deltaX < 0) {
+                navigate('prev');
+                lastScrollTimeRef.current = now;
+            }
+        };
+
+        container.addEventListener('wheel', handleNativeWheel, { passive: false });
+        return () => {
+            container.removeEventListener('wheel', handleNativeWheel);
+        };
+    }, [navigate]);
 
     const handleMouseEnter = () => {
         if (autoplay && pauseOnHover) {
@@ -248,6 +272,7 @@ export const ThreeDImageCarousel: React.FC<ThreeDImageCarouselProps> = ({
 
             {/* 2. SLIDER HTML STRUCTURE */}
             <div
+                ref={containerRef}
                 className={`cascade-slider_container ${className} bg-transparent w-full`}
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleExit}
@@ -267,8 +292,8 @@ export const ThreeDImageCarousel: React.FC<ThreeDImageCarouselProps> = ({
                                 key={item.id}
                                 className={`cascade-slider_item ${slideClass}`}
                                 style={{
-                                    width: isActive ? '340px' : '260px',
-                                    height: '210px',
+                                    width: isActive ? '450px' : '340px',
+                                    height: '280px',
                                 }}
                                 onClick={() => {
                                     if (isActive) {

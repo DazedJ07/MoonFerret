@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/header';
 import Sidebar from '@/components/sidebar';
-import SubNav from '@/components/sub-nav';
 import MainContent from '@/components/main-content';
 import UtilityBar from '@/components/utility-bar';
 import { useNavigation, type ViewId } from '@/hooks/use-navigation';
@@ -104,8 +103,8 @@ export default function App() {
   }, [spacesList, activeView, isMounted, activeCarouselIndex]);
 
   // 2. Direct Callback: Sidebar navigation changes activeView directly
-  const handleSidebarNavigate = useCallback((spaceId: ViewId) => {
-    navigate(spaceId);
+  const handleSidebarNavigate = useCallback((spaceId: ViewId | string) => {
+    navigate(spaceId as ViewId);
     switchTab('my-items'); // Always reset to items tab when navigating
   }, [navigate, switchTab]);
 
@@ -492,25 +491,22 @@ export default function App() {
       />
 
       {/* Main Three-Column Layout */}
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 font-sans">
-        <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] xl:grid-cols-[240px_1fr_300px] gap-6 w-full min-w-0">
-          {/* Left Sidebar */}
-          <Sidebar 
-            activeView={activeView} 
-            onNavigate={handleSidebarNavigate}
-            spaces={spacesList}
-            onAddSpaceClick={() => setIsAddSpaceOpen(true)}
-            onDeleteSpace={handleDeleteSpace}
-            totalItems={totalItemsCount}
-            utilization={utilizationRate}
-          />
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 font-sans lg:pl-[264px]">
+        <Sidebar 
+          activeView={activeView} 
+          onNavigate={handleSidebarNavigate}
+          activeTab={activeTab}
+          onTabChange={switchTab}
+          spaces={spacesList}
+          onAddSpaceClick={() => setIsAddSpaceOpen(true)}
+          onDeleteSpace={handleDeleteSpace}
+          totalItems={totalItemsCount}
+          utilization={utilizationRate}
+        />
 
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6 w-full min-w-0">
           {/* Center Content Area */}
           <div className="flex-1 min-w-0 space-y-5">
-            {/* Sub-Navigation Pill Bar — Centered within its track */}
-            <div className="flex justify-center w-full">
-              <SubNav activeTab={activeTab} onTabChange={switchTab} />
-            </div>
 
             {/* Active View */}
             <MainContent
@@ -691,8 +687,13 @@ export default function App() {
               <Sidebar
                 activeView={activeView}
                 onNavigate={(view) => {
-                  handleSidebarNavigate(view);
+                  handleSidebarNavigate(view as ViewId | string);
                   setIsMobileSidebarOpen(false); // Auto close drawer on navigation
+                }}
+                activeTab={activeTab}
+                onTabChange={(tab) => {
+                  switchTab(tab);
+                  setIsMobileSidebarOpen(false); // Auto close drawer on tab change
                 }}
                 spaces={spacesList}
                 onAddSpaceClick={() => {

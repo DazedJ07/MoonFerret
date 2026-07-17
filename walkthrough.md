@@ -44,6 +44,8 @@
     - **Tailwind CSS v4 Integration**: Native integration using `@tailwindcss/vite` plugin to resolve compiled stylesheets directly within the bundle rather than relying on external PostCSS configs.
     - **Lightswind 3D Carousel**: Integrated `ThreeDImageCarousel` under [3d-image-carousel.tsx](file:///c:/Users/Jian%20Medina/Desktop/LaMoon/src/components/lightswind/3d-image-carousel.tsx), customized to render structured room cards with overlapping 3D cascade scaling and swipe controls. Used in `dashboard-view.tsx` and `space-view.tsx`.
     - **Layout & Transition Smoothing**: Removed the bulky grey double-bordered box wrapper to let the carousel cards float natively on the page. Sync'ed the transition keys in `MainContent` to prevent the carousel from unmounting and remounting on slide changes, achieving seamless butter-smooth sliding. Added depth of field grayscale and blur filters for inactive slides to make the active slide pop.
+    - **Size & Navigation Refinement**: Scaled up card sizes by ~30% (active cards: `450px x 280px`) and centered the carousel navigation arrow buttons closer to the active slide. Added mouse wheel / trackpad scroll navigation support (using debounced native non-passive event listeners to prevent accidental page scroll).
+    - **Sidebar Consolidation**: Removed the top pill SubNav navigation bar entirely. Created unified sidebar sections: "Workspace" (housing Dashboard, My Outfits, My Notes, and Todo List) and "Spaces" (dynamic listing of user-created rooms with the `+` add button and trash options intact).
 
 ---
 

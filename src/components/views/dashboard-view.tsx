@@ -86,8 +86,12 @@ export default function DashboardView({
 }: DashboardViewProps) {
   const [selectedStorageId, setSelectedStorageId] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [catalogPage, setCatalogPage] = useState(0);
   const [activeFilter, setActiveFilter] = useState<string>('All');
   const [activeSubFilter, setActiveSubFilter] = useState<string>('All');
+  const catalogScrollRef = useRef<HTMLDivElement | null>(null);
+
+  const CATALOG_CARD_STEP = 276;
 
   // Animated greetings
   const [randomGreetingTag, setRandomGreetingTag] = useState('');
@@ -232,6 +236,20 @@ export default function DashboardView({
       return matchUnitName || matchUnitType || matchSpaceName || matchItems;
     });
   }, [storageUnitsList, activeSpaceId, selectedStorageId, searchQuery, individualItemsList, isOverall]);
+
+  const updateCatalogPage = () => {
+    if (!catalogScrollRef.current || activeStorages.length === 0) return;
+    const scrollLeft = catalogScrollRef.current.scrollLeft;
+    const newPage = Math.round(scrollLeft / CATALOG_CARD_STEP);
+    setCatalogPage(Math.max(0, Math.min(activeStorages.length - 1, newPage)));
+  };
+
+  useEffect(() => {
+    setCatalogPage(0);
+    if (catalogScrollRef.current) {
+      catalogScrollRef.current.scrollLeft = 0;
+    }
+  }, [activeStorages.length]);
 
   // Fallback for drill-down catalog selection
   const activeSelectedStorage = useMemo(() => {
@@ -806,93 +824,129 @@ export default function DashboardView({
             )}
           </div>
 
-          {/* Catalog grid */}
-          <div className={`w-full ${activeStorages.length > 6 ? 'max-h-[520px] overflow-y-auto pr-2' : ''}`}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {activeStorages.map((unit) => {
-                const isSelected = unit.id === selectedStorageId;
-                const hasImg = !!unit.imageUrl;
-
-                return (
+          {/* Catalog carousel */}
+          <div className="w-full">
+            {activeStorages.length > 0 ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-start gap-2">
                   <button
-                    key={unit.id}
+                    type="button"
                     onClick={() => {
-                      if (!isOverall) {
-                        setSelectedStorageId(unit.id);
-                        setSelectedItemId(null);
-                      } else {
-                        // Quick Link Navigation: go directly to the storage when clicked in Global Catalog
-                        if (unit.spaceId && unit.spaceId !== 'unassigned') {
-                          localStorage.setItem('moonferret-selected-storage-id', unit.id);
-                          onNavigateToSpace?.(unit.spaceId as ViewId);
-                        }
-                      }
+                      if (!catalogScrollRef.current) return;
+                      catalogScrollRef.current.scrollBy({ left: -CATALOG_CARD_STEP * 2, behavior: 'smooth' });
                     }}
-                    className={`text-left rounded-2xl border p-4.5 flex flex-col justify-between h-48 shadow-sm transition-all duration-300 hover:scale-[1.01] hover:shadow-md relative overflow-hidden group cursor-pointer ${
-                      isSelected && !isOverall
-                        ? 'border-brand bg-brand/5 ring-1 ring-brand/30'
-                        : 'border-border-main/45 bg-card/65 backdrop-blur-md dark:bg-card/35'
-                    }`}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border-main/20 bg-white text-secondary transition hover:bg-canvas hover:text-primary"
+                    aria-label="Scroll left"
                   >
-                    {/* Explicit Delete Button */}
-                    {!isOverall && (
-                      <span
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteStorage(unit.id);
-                        }}
-                        className="absolute top-3 right-3 z-20 p-1.5 bg-card hover:bg-rose-500/10 rounded-full border border-border-main/30 shadow-md text-stone-400 hover:text-rose-500 transition-all duration-200 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 cursor-pointer"
-                        title="Delete Storage"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </span>
-                    )}
-
-                    {/* Background preview */}
-                    {hasImg ? (
-                      <div className="absolute inset-0 z-0">
-                        <img src={unit.imageUrl} alt={unit.name} className="w-full h-full object-cover opacity-20" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-card via-card/90 to-transparent" />
-                      </div>
-                    ) : (
-                      <div className="absolute inset-0 z-0 bg-gradient-to-br from-canvas/50 to-transparent opacity-50" />
-                    )}
-
-                    <div className="relative z-10 w-full">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="pr-6">
-                          <h4 className="text-sm font-bold text-primary truncate">{unit.name}</h4>
-                          <p className="text-[10px] text-secondary mt-0.5 uppercase tracking-widest font-semibold">{unit.type || 'Storage Cabinet'}</p>
-                        </div>
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border shrink-0 ${
-                          unit.status === 'full' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
-                          unit.status === 'has-spares' ? 'bg-brand/10 text-brand border-brand/20' :
-                          'bg-stone-500/10 text-stone-500 border-border-main/30'
-                        }`}>
-                          {unit.status}
-                        </span>
-                      </div>
-                      {unit.compartments && (
-                        <p className="text-[10px] text-secondary mt-2 font-medium">{unit.compartments} active compartments</p>
-                      )}
-                    </div>
-
-                    <div className="relative z-10 w-full pt-4 border-t border-border-main/20 flex items-center justify-between text-[10px]">
-                      <span className="text-secondary font-medium">Capacity Utilized</span>
-                      <span className="font-bold text-primary">{unit.totalItems} / {unit.capacity} items</span>
-                    </div>
+                    <ChevronLeft className="h-4 w-4" />
                   </button>
-                );
-              })}
-
-              {activeStorages.length === 0 && (
-                <div className="col-span-full py-12 text-center text-secondary text-xs">
-                  {selectedStorageId 
-                    ? 'No child storage units / drawers defined here.' 
-                    : 'No storage containers cataloged in this space.'}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!catalogScrollRef.current) return;
+                      catalogScrollRef.current.scrollBy({ left: CATALOG_CARD_STEP * 2, behavior: 'smooth' });
+                    }}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border-main/20 bg-white text-secondary transition hover:bg-canvas hover:text-primary"
+                    aria-label="Scroll right"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                  <span className="text-xs text-secondary font-semibold tracking-[0.24em] ml-auto hidden sm:inline">
+                    {`${catalogPage + 1} / ${activeStorages.length}`}
+                  </span>
                 </div>
-              )}
-            </div>
+
+                <div
+                  ref={catalogScrollRef}
+                  onScroll={updateCatalogPage}
+                  className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 scrollbar-hide"
+                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
+                  {activeStorages.map((unit) => {
+                    const isSelected = unit.id === selectedStorageId;
+
+                    return (
+                      <button
+                        key={unit.id}
+                        onClick={() => {
+                          if (!isOverall) {
+                            setSelectedStorageId(unit.id);
+                            setSelectedItemId(null);
+                          } else {
+                            if (unit.spaceId && unit.spaceId !== 'unassigned') {
+                              localStorage.setItem('moonferret-selected-storage-id', unit.id);
+                              onNavigateToSpace?.(unit.spaceId as ViewId);
+                            }
+                          }
+                        }}
+                        className={`snap-start min-w-[260px] max-w-[260px] flex-none relative overflow-hidden rounded-3xl border bg-white shadow-sm transition duration-200 text-left group ${
+                          isSelected && !isOverall ? 'border-brand bg-brand/5 ring-1 ring-brand/30' : 'border-border-main/20'
+                        }`}
+                      >
+                        {!isOverall && (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteStorage(unit.id);
+                            }}
+                            className="absolute right-3 top-3 z-20 inline-flex h-8 w-8 items-center justify-center rounded-full border border-border-main/20 bg-white text-secondary opacity-0 transition duration-200 group-hover:opacity-100 hover:bg-rose-50 hover:text-rose-500"
+                            title="Delete Storage"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </span>
+                        )}
+
+                        {unit.imageUrl ? (
+                          <div className="relative h-40 w-full overflow-hidden bg-slate-100">
+                            <img src={unit.imageUrl} alt={unit.name} className="h-full w-full object-cover" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
+                          </div>
+                        ) : (
+                          <div className="flex h-40 w-full items-center justify-center rounded-t-3xl bg-canvas/60 text-[11px] uppercase tracking-[0.22em] text-secondary">
+                            No photo available
+                          </div>
+                        )}
+
+                        <div className="flex flex-col h-full">
+                          <div className="p-4 space-y-3 relative z-10">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <h4 className="text-sm font-semibold text-primary truncate">{unit.name}</h4>
+                                <p className="mt-1 text-[10px] uppercase tracking-[0.24em] text-secondary font-semibold">
+                                  {unit.type || 'Storage Cabinet'}
+                                </p>
+                              </div>
+                              <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] ${
+                                unit.status === 'full' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' :
+                                unit.status === 'has-spares' ? 'bg-brand/10 text-brand border border-brand/20' :
+                                'bg-stone-100 text-stone-600 border border-border-main/20'
+                              }`}>
+                                {unit.status}
+                              </span>
+                            </div>
+                            {unit.compartments && (
+                              <p className="text-[10px] text-secondary">{unit.compartments} active compartments</p>
+                            )}
+                          </div>
+                          <div className="border-t border-border-main/20 p-4 text-[11px] text-secondary">
+                            <div className="flex items-center justify-between gap-3">
+                              <span>Capacity Utilized</span>
+                              <span className="font-semibold text-primary">{unit.totalItems} / {unit.capacity} items</span>
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="py-12 text-center text-secondary text-xs">
+                {selectedStorageId 
+                  ? 'No child storage units / drawers defined here.' 
+                  : 'No storage containers cataloged in this space.'}
+              </div>
+            )}
           </div>
         </div>
 

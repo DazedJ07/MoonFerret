@@ -1,172 +1,162 @@
-'use client';
-
-import { BedDouble, CookingPot, Bath, Sofa, Plus, Trash2, Folder, LayoutDashboard } from 'lucide-react';
+import { Home, Plus, Trash2, Shirt, ClipboardList, StickyNote, Folder } from 'lucide-react';
+import type { Space } from '@/data/mock-data';
 import type { ViewId } from '@/hooks/use-navigation';
-import type { Space } from '@/data/types';
 
 interface SidebarProps {
-  activeView: ViewId;
-  onNavigate: (view: ViewId) => void;
-  spaces: Space[];
-  onAddSpaceClick: () => void;
-  onDeleteSpace: (id: string) => void;
-  totalItems: number;
-  utilization: number;
+  activeView: string;
+  onNavigate: (view: ViewId | string) => void;
+  activeTab: string;
+  onTabChange: (tab: any) => void;
+  spaces?: Space[];
+  onAddSpaceClick?: () => void;
+  onDeleteSpace?: (spaceId: string) => void;
+  totalItems?: number;
+  utilization?: number;
   className?: string;
 }
 
-const iconMap: Record<string, typeof BedDouble> = {
-  'my-room': BedDouble,
-  'kitchen': CookingPot,
-  'comfort-room': Bath,
-  'living-room': Sofa,
-};
-
-export default function Sidebar({ 
-  activeView, 
-  onNavigate, 
-  spaces, 
-  onAddSpaceClick, 
+export default function Sidebar({
+  activeView,
+  onNavigate,
+  activeTab,
+  onTabChange,
+  spaces = [],
+  onAddSpaceClick,
   onDeleteSpace,
-  totalItems,
-  utilization,
-  className
+  totalItems = 0,
+  utilization = 0,
+  className,
 }: SidebarProps) {
+  const sidebarClassName = className
+    ? className
+    : 'hidden lg:block fixed left-6 top-24 max-h-[calc(100vh-6rem)] w-[240px] rounded-3xl border border-border-main/20 bg-card p-3 shadow-sm space-y-3 overflow-y-auto';
+
+  // General workspace links
+  const generalLinks = [
+    { id: 'dashboard', label: 'Dashboard', icon: Home, tab: 'my-items' },
+    { id: 'outfits', label: 'My Outfits', icon: Shirt, tab: 'my-outfits' },
+    { id: 'notes', label: 'My Notes', icon: StickyNote, tab: 'my-notes' },
+    { id: 'todo', label: 'Todo List', icon: ClipboardList, tab: 'todo-list' },
+  ];
+
   return (
-    <aside className={className || "w-full min-w-0 hidden lg:block"}>
-      <div className="lg:sticky lg:top-24 glass-liquid rounded-2xl p-4 space-y-3 transition-all duration-300">
-        {/* Brand */}
-        <div className="px-3 pt-1 pb-2">
-          <h2 className="text-lg font-bold text-primary tracking-tight">
-            <span className="text-brand">Moon</span>Ferret
-          </h2>
-          <p className="text-[10px] text-secondary font-medium uppercase tracking-widest mt-0.5">
-            Inventory Tracker
-          </p>
+    <aside className={sidebarClassName}>
+      {/* Header Logo */}
+      <div className="rounded-3xl border border-border-main/20 bg-background/90 p-3 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="h-12 w-12 overflow-hidden rounded-2xl bg-canvas/80 flex items-center justify-center border border-border-main/20">
+            <img src="/Ico/Moonferret.png" alt="MoonFerret Logo" className="h-full w-full object-contain" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-[0.24em] text-secondary/70">MoonFerret</p>
+            <h1 className="text-sm font-semibold text-primary truncate">MoonFerret Home</h1>
+            <p className="text-[10px] text-secondary mt-1">Inventory Tracker</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-border-main/20 bg-white/90 p-3 shadow-sm space-y-3">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.24em] text-secondary/70 mb-3">Workspace</p>
+          <div className="space-y-2">
+          {generalLinks.map((item) => {
+            const isActive = item.tab === 'my-items' 
+              ? (activeView === 'dashboard' && activeTab === 'my-items')
+              : (activeTab === item.tab);
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  if (item.tab === 'my-items') {
+                    onNavigate('dashboard');
+                  }
+                  onTabChange(item.tab);
+                }}
+                className={`flex w-full items-center gap-2 rounded-2xl px-2.5 py-2 text-left text-sm transition font-medium ${
+                  isActive ? 'bg-brand/10 text-primary font-semibold' : 'text-secondary hover:bg-canvas'
+                }`}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </button>
+            );
+          })}
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-border-main/20 bg-white/90 p-3 shadow-sm space-y-3">
+        <div className="mb-2 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.24em] text-secondary/70">Inventory</p>
+            <h2 className="text-sm font-semibold text-primary">Spaces</h2>
+          </div>
+          {onAddSpaceClick && (
+            <button
+              type="button"
+              onClick={onAddSpaceClick}
+              className="rounded-full border border-border-main/20 p-1 text-secondary transition hover:bg-canvas cursor-pointer"
+              aria-label="Add space"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
-        {/* Divider — soft gray stroke */}
-        <div className="h-px bg-border-main/50 mx-1" />
-
-        {/* Navigation */}
-        <nav className="space-y-1">
-          {/* Dashboard Overall Nav Button */}
-          <button
-            onClick={() => onNavigate('dashboard')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-300 ease-out hover:scale-[1.02] hover:bg-canvas group ${
-              activeView === 'dashboard'
-                ? 'bg-brand/10 text-primary border-l-2 border-brand font-semibold'
-                : 'text-secondary hover:text-primary'
-            }`}
-          >
-            <div
-              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 ${
-                activeView === 'dashboard'
-                  ? 'bg-brand/20'
-                  : 'bg-canvas group-hover:bg-card'
-              }`}
-            >
-              <LayoutDashboard className={`w-4 h-4 transition-colors duration-300 ${
-                activeView === 'dashboard' ? 'text-brand' : 'text-secondary group-hover:text-primary'
-              }`} />
-            </div>
-            <span>Dashboard</span>
-            {activeView === 'dashboard' && (
-              <div className="ml-auto w-1.5 h-1.5 rounded-full bg-brand" />
-            )}
-          </button>
-
-          <div className="h-px bg-border-main/30 my-2 mx-1" />
-
-          {/* Spaces Header with [+] Action */}
-          <div className="flex items-center justify-between px-3 py-1.5">
-            <p className="text-[10px] font-semibold text-secondary uppercase tracking-widest">
-              Spaces
-            </p>
-            <button 
-              onClick={onAddSpaceClick}
-              className="p-1 hover:bg-canvas rounded-full text-secondary hover:text-primary transition-colors cursor-pointer"
-              aria-label="Add Space"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Dynamic Spaces List */}
-          <div className="space-y-0.5">
-            {spaces.map((space) => {
-              const isActive = activeView === space.id;
-              const IconComp = iconMap[space.id] || Folder;
-
-              return (
-                <div 
-                  key={space.id} 
-                  className="group/item relative flex items-center w-full"
-                >
-                  <button
-                    onClick={() => onNavigate(space.id as ViewId)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-300 ease-out hover:scale-[1.02] hover:bg-canvas group ${
-                      isActive
-                        ? 'bg-brand/10 text-primary border-l-2 border-brand font-semibold'
-                        : 'text-secondary hover:text-primary'
-                    }`}
-                  >
-                    <div
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 ${
-                        isActive
-                          ? 'bg-brand/20'
-                          : 'bg-canvas group-hover:bg-card'
-                      }`}
-                    >
-                      <IconComp
-                        className={`w-4 h-4 transition-colors duration-300 ${
-                          isActive ? 'text-brand' : 'text-secondary group-hover:text-primary'
-                        }`}
-                      />
-                    </div>
-                    <span className="truncate pr-4">{space.name}</span>
-                    {isActive && (
-                      <div className="ml-auto w-1.5 h-1.5 rounded-full bg-brand" />
-                    )}
-                  </button>
-
-                  {/* Delete Button (Visible on Hover) */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
+        <div className="space-y-1">
+          {spaces.map((space) => {
+            const isActive = activeView === space.id && activeTab === 'my-items';
+            return (
+              <button
+                key={space.id}
+                type="button"
+                onClick={() => {
+                  onNavigate(space.id);
+                  onTabChange('my-items');
+                }}
+                className={`flex w-full items-center justify-between rounded-2xl px-2.5 py-2 text-left text-sm transition font-medium ${
+                  isActive ? 'bg-brand/10 text-primary font-semibold' : 'text-secondary hover:bg-canvas'
+                }`}
+              >
+                <span className="flex items-center gap-2.5">
+                  <Folder className="h-4 w-4" />
+                  {space.name}
+                </span>
+                {onDeleteSpace && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(event) => {
+                      event.stopPropagation();
                       onDeleteSpace(space.id);
                     }}
-                    className="absolute right-2 opacity-0 group-hover/item:opacity-100 hover:text-rose-500 p-1 bg-card rounded-md border border-border-main/20 shadow-sm transition-all duration-200 cursor-pointer"
+                    className="rounded-full p-1 text-secondary/70 hover:bg-canvas hover:text-primary cursor-pointer"
                     aria-label={`Delete ${space.name}`}
                   >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              );
-            })}
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Stats Section */}
+      <div className="rounded-3xl border border-border-main/20 bg-background/90 p-3 text-xs text-secondary mt-2 shadow-sm">
+        <div className="flex items-center justify-between pb-3 border-b border-border-main/20">
+          <span className="font-semibold text-secondary uppercase tracking-[0.22em]">Quick Stats</span>
+        </div>
+        <div className="mt-3 space-y-3">
+          <div className="flex items-center justify-between text-[11px]">
+            <span>Total Items</span>
+            <span className="font-semibold text-primary">{totalItems}</span>
           </div>
-        </nav>
-
-        {/* Divider */}
-        <div className="h-px bg-border-main/50 mx-1" />
-
-        {/* Quick Stats */}
-        <div className="px-3 py-1">
-          <p className="text-[10px] font-semibold text-secondary uppercase tracking-widest mb-3">
-            Quick Stats
-          </p>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-secondary">Total Items</span>
-              <span className="text-xs font-semibold text-primary">{totalItems}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-secondary">Utilization</span>
-              <span className="text-xs font-semibold text-primary">{utilization}%</span>
-            </div>
-            <div className="w-full h-1.5 bg-canvas overflow-hidden mt-1 rounded-full border border-border-main/40">
-              <div style={{ width: `${utilization}%` }} className="h-full bg-brand rounded-full transition-all duration-500" />
-            </div>
+          <div className="flex items-center justify-between text-[11px]">
+            <span>Utilization</span>
+            <span className="font-semibold text-primary">{utilization}%</span>
           </div>
         </div>
       </div>
