@@ -43,6 +43,7 @@
     - **Next.js to Vite Migration**: Migrated the single-page application framework from Next.js to Vite, speeding up local start-up and build times significantly.
     - **Tailwind CSS v4 Integration**: Native integration using `@tailwindcss/vite` plugin to resolve compiled stylesheets directly within the bundle rather than relying on external PostCSS configs.
     - **Lightswind 3D Carousel**: Integrated `ThreeDImageCarousel` under [3d-image-carousel.tsx](file:///c:/Users/Jian%20Medina/Desktop/LaMoon/src/components/lightswind/3d-image-carousel.tsx), customized to render structured room cards with overlapping 3D cascade scaling and swipe controls. Used in `dashboard-view.tsx` and `space-view.tsx`.
+    - **Layout & Transition Smoothing**: Removed the bulky grey double-bordered box wrapper to let the carousel cards float natively on the page. Sync'ed the transition keys in `MainContent` to prevent the carousel from unmounting and remounting on slide changes, achieving seamless butter-smooth sliding. Added depth of field grayscale and blur filters for inactive slides to make the active slide pop.
 
 ---
 
