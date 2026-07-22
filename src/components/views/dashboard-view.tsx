@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import ThreeDImageCarousel, { type CarouselItem } from '@/components/lightswind/3d-image-carousel';
+import Masonry from '@/components/ui/Masonry';
 import { 
   Space, 
   StorageUnit, 
@@ -20,7 +21,7 @@ import {
   Package, Archive, AlertTriangle, ChevronRight, 
   Plus, Minus, Tag, Image as ImageIcon, X, Sliders, Info, Trash2, Edit3, ChevronLeft
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase, uploadImageToStorage } from '@/lib/supabase';
 import AnimatedList from '@/components/dashboard/animated-list';
 
 // Import newly extracted modal components
@@ -107,6 +108,8 @@ export default function DashboardView({
   const [editSpaceDesc, setEditSpaceDesc] = useState('');
   const [editSpaceDim, setEditSpaceDim] = useState('');
   const [editSpaceImage, setEditSpaceImage] = useState<string | null>(null);
+  const [isSpaceImageUploading, setIsSpaceImageUploading] = useState(false);
+  const [itemsViewMode, setItemsViewMode] = useState<'list' | 'masonry'>('list');
 
 
 
@@ -304,6 +307,21 @@ export default function DashboardView({
       return true;
     });
   }, [itemsInStorage, searchQuery, activeFilter, activeSubFilter]);
+
+  // Map active items for Masonry Pinterest layout
+  const masonryItems = useMemo(() => {
+    return activeItems.map((item, idx) => {
+      // Deterministic staggered height mapping to prevent layout jumps
+      const heights = [340, 420, 380, 460, 400];
+      const height = heights[idx % heights.length];
+      return {
+        id: item.id,
+        name: item.name,
+        img: item.imageUrl || `https://picsum.photos/seed/${item.id}/600/600`,
+        height: height
+      };
+    });
+  }, [activeItems]);
 
   // Compute category count mapping for filter badges
   const categoryCounts = useMemo(() => {
@@ -959,6 +977,34 @@ export default function DashboardView({
                 <h4 className="text-xs font-bold text-primary">Stored Items: {activeSelectedStorage.name}</h4>
               </div>
               <div className="flex items-center gap-2">
+                {/* Layout View Switcher */}
+                <div className="flex bg-canvas p-0.5 rounded-lg border border-border-main/30 shrink-0 mr-1">
+                  <button
+                    type="button"
+                    onClick={() => setItemsViewMode('list')}
+                    className={`p-1 rounded-md transition-all cursor-pointer ${
+                      itemsViewMode === 'list' 
+                        ? 'bg-card text-brand shadow-xs' 
+                        : 'text-secondary/60 hover:text-primary'
+                    }`}
+                    title="List View"
+                  >
+                    <Sliders className="w-3 h-3 rotate-90" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setItemsViewMode('masonry')}
+                    className={`p-1 rounded-md transition-all cursor-pointer ${
+                      itemsViewMode === 'masonry' 
+                        ? 'bg-card text-brand shadow-xs' 
+                        : 'text-secondary/60 hover:text-primary'
+                    }`}
+                    title="Pinterest Grid View"
+                  >
+                    <ImageIcon className="w-3 h-3" />
+                  </button>
+                </div>
+
                 <button
                   type="button"
                   onClick={() => setIsEditStorageOpen(true)}
@@ -1002,92 +1048,104 @@ export default function DashboardView({
             </div>
 
             {/* Items list wrapper */}
-            <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1.5">
-              <AnimatedList className="space-y-2">
-                {activeItems.map((item) => (
-                  <div
-                    key={item.id}
-                    onClick={() => setSelectedItemId(item.id)}
-                    className={`p-3 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-all duration-300 hover:scale-[1.01] ${
-                      selectedItemId === item.id 
-                        ? 'border-brand bg-brand/5' 
-                        : 'border-border-main/30 bg-card hover:bg-canvas/20'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-canvas overflow-hidden shrink-0 border border-border-main/20 relative">
-                        {item.imageUrl ? (
-                          <img 
-                            src={item.imageUrl} 
-                            alt={item.name} 
-                            className={
-                              item.imageUrl.endsWith('#contain')
-                                ? 'max-w-full max-h-full object-contain w-auto h-auto rounded-lg absolute inset-0 m-auto'
-                                : 'w-full h-full object-cover'
-                            } 
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-brand/10 text-brand font-bold text-xs">
-                            {item.name.charAt(0)}
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs font-bold text-primary truncate">{item.name}</p>
-                          <span className="text-[8px] bg-brand/10 text-brand border border-brand/20 px-1.5 py-0.2 rounded font-extrabold uppercase tracking-wide">
-                            {item.itemType === 'clothing' ? `Clothing: ${item.subCategory || 'Tops'}` : (item.category || 'Accessory')}
-                          </span>
+            <div className={`space-y-2 pr-1.5 ${itemsViewMode === 'list' ? 'max-h-[350px] overflow-y-auto' : 'max-h-[600px] overflow-y-auto'}`}>
+              {itemsViewMode === 'list' ? (
+                <AnimatedList className="space-y-2">
+                  {activeItems.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => setSelectedItemId(item.id)}
+                      className={`p-3 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-all duration-300 hover:scale-[1.01] ${
+                        selectedItemId === item.id 
+                          ? 'border-brand bg-brand/5' 
+                          : 'border-border-main/30 bg-card hover:bg-canvas/20'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-canvas overflow-hidden shrink-0 border border-border-main/20 relative">
+                          {item.imageUrl ? (
+                            <img 
+                              src={item.imageUrl} 
+                              alt={item.name} 
+                              className={
+                                item.imageUrl.endsWith('#contain')
+                                  ? 'max-w-full max-h-full object-contain w-auto h-auto rounded-lg absolute inset-0 m-auto'
+                                  : 'w-full h-full object-cover'
+                              } 
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-brand/10 text-brand font-bold text-xs">
+                              {item.name.charAt(0)}
+                            </div>
+                          )}
                         </div>
-                        <p className="text-[10px] text-secondary mt-0.5 truncate">{item.description || 'No description added'}</p>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-bold text-primary truncate">{item.name}</p>
+                            <span className="text-[8px] bg-brand/10 text-brand border border-brand/20 px-1.5 py-0.2 rounded font-extrabold uppercase tracking-wide">
+                              {item.itemType === 'clothing' ? `Clothing: ${item.subCategory || 'Tops'}` : (item.category || 'Accessory')}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-secondary mt-0.5 truncate">{item.description || 'No description added'}</p>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Adjusters and badges */}
-                    <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0" onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-bold uppercase tracking-wider bg-canvas border border-border-main/20 px-2 py-0.5 rounded-full text-secondary">
-                          {item.condition}
-                        </span>
-                        {item.isSpare && (
-                          <span className="text-[9px] font-bold uppercase tracking-wider bg-brand/10 text-brand border border-brand/25 px-2 py-0.5 rounded-full">
-                            Spare
+                      {/* Adjusters and badges */}
+                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-bold uppercase tracking-wider bg-canvas border border-border-main/20 px-2 py-0.5 rounded-full text-secondary">
+                            {item.condition}
                           </span>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center gap-1 bg-canvas p-1 rounded-full border border-border-main/30">
+                          {item.isSpare && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider bg-brand/10 text-brand border border-brand/25 px-2 py-0.5 rounded-full">
+                              Spare
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-1 bg-canvas p-1 rounded-full border border-border-main/30">
+                          <button
+                            onClick={() => handleQuantityAdjust(item.id, 'dec')}
+                            className="w-6 h-6 rounded-full bg-card hover:bg-canvas flex items-center justify-center shadow-sm border border-border-main/10 cursor-pointer"
+                          >
+                            <Minus className="w-2.5 h-2.5 text-secondary" />
+                          </button>
+                          <span className="w-6 text-center text-xs font-bold text-primary tabular-nums">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => handleQuantityAdjust(item.id, 'inc')}
+                            className="w-6 h-6 rounded-full bg-brand/10 hover:bg-brand/20 flex items-center justify-center shadow-sm border border-brand/20 cursor-pointer"
+                          >
+                            <Plus className="w-2.5 h-2.5 text-brand" />
+                          </button>
+                        </div>
+                        
                         <button
-                          onClick={() => handleQuantityAdjust(item.id, 'dec')}
-                          className="w-6 h-6 rounded-full bg-card hover:bg-canvas flex items-center justify-center shadow-sm border border-border-main/10 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteItem(item.id);
+                          }}
+                          className="p-1 hover:bg-canvas rounded text-secondary/40 hover:text-rose-500 transition-colors cursor-pointer"
+                          title="Delete item"
                         >
-                          <Minus className="w-2.5 h-2.5 text-secondary" />
-                        </button>
-                        <span className="w-6 text-center text-xs font-bold text-primary tabular-nums">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() => handleQuantityAdjust(item.id, 'inc')}
-                          className="w-6 h-6 rounded-full bg-brand/10 hover:bg-brand/20 flex items-center justify-center shadow-sm border border-brand/20 cursor-pointer"
-                        >
-                          <Plus className="w-2.5 h-2.5 text-brand" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
-                      
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteItem(item.id);
-                        }}
-                        className="p-1 hover:bg-canvas rounded text-secondary/40 hover:text-rose-500 transition-colors cursor-pointer"
-                        title="Delete item"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
                     </div>
-                  </div>
-                ))}
-              </AnimatedList>
+                  ))}
+                </AnimatedList>
+              ) : (
+                <div className="py-1">
+                  <Masonry 
+                    items={masonryItems} 
+                    onItemClick={(id) => setSelectedItemId(id)}
+                    scaleOnHover
+                    hoverScale={0.97}
+                    blurToFocus
+                  />
+                </div>
+              )}
 
               {activeItems.length === 0 && (
                 <div className="text-center py-8">
@@ -1224,6 +1282,47 @@ export default function DashboardView({
                   />
                 </div>
 
+                <div className="space-y-1.5">
+                  <label className="font-bold text-secondary">Space Background Image</label>
+                  <div className="relative h-9">
+                     <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isSpaceImageUploading}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setIsSpaceImageUploading(true);
+                          const url = await uploadImageToStorage(file, 'spaces');
+                          if (url) {
+                            setEditSpaceImage(url);
+                          }
+                          setIsSpaceImageUploading(false);
+                        }
+                      }}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                    />
+                    <div className="absolute inset-0 bg-canvas/30 rounded-xl border border-border-main/40 flex items-center justify-center gap-1.5 hover:bg-canvas/50">
+                      <ImageIcon className="w-3.5 h-3.5 text-secondary" />
+                      <span className="text-[10px] text-secondary font-medium">
+                        {isSpaceImageUploading ? 'Uploading...' : editSpaceImage ? 'Selected / Uploaded ✅' : 'Choose File'}
+                      </span>
+                    </div>
+                  </div>
+                  {editSpaceImage && !isSpaceImageUploading && (
+                    <div className="relative w-full h-24 rounded-xl overflow-hidden mt-2 border border-border-main/20 shadow-xs">
+                      <img src={editSpaceImage} alt="Space Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setEditSpaceImage(null)}
+                        className="absolute top-1.5 right-1.5 p-1 bg-black/60 hover:bg-black/80 rounded-full text-white cursor-pointer transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 <div className="pt-3 border-t border-border-main/20 flex justify-end gap-2">
                   <button 
                     type="button" 
@@ -1234,9 +1333,10 @@ export default function DashboardView({
                   </button>
                   <button 
                     type="submit" 
-                    className="h-8.5 px-4 rounded-full bg-brand text-brand-foreground font-bold hover:brightness-95 shadow-sm"
+                    disabled={isSpaceImageUploading}
+                    className="h-8.5 px-4 rounded-full bg-brand text-brand-foreground font-bold hover:brightness-95 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                   >
-                    Save Changes
+                    {isSpaceImageUploading ? 'Uploading...' : 'Save Changes'}
                   </button>
                 </div>
               </form>
