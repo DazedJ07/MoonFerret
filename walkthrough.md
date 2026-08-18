@@ -50,8 +50,9 @@
     - **Pinterest-Style Masonry Layout**: Created a GSAP-driven responsive [Masonry.tsx](file:///c:/Users/Jian%20Medina/Desktop/LaMoon/src/components/ui/Masonry.tsx) grid thumbnail view to layout inventory assets dynamically with staggered height tiles. Added a layout switch toggle in the catalog items header to transition seamlessly between List View and Pinterest Grid, displaying full-color pictures with item names printed clearly underneath, and supporting detail-modal click overrides for instant edit operations. Added full aspect-ratio rendering support that honors the `#contain` image settings (scaling images inside tiles using `object-contain` rather than cropping them).
     - **Outfit Builder Stacking Order**: Wrapped the Outfit Builder modal in a React Portal (`createPortal`) targeting `document.body` and elevated its container `z-index` to `z-[100]`. This completely escapes the transform stacking context created by parent tab animation containers, keeping the Outfit Builder fully visible and centered on the screen without overlapping behind the sticky header. All other space/drawer modals were reverted back to their original scopes as requested.
     - **Surprise Tab (Monthsary Celebration & Gallery)**: Added a "Surprise 💖" workspace tab linked to [`surprise-view.tsx`](file:///c:/Users/Jian%20Medina/Desktop/LaMoon/src/components/views/surprise-view.tsx). This tab contains:
-      - 💌 An interactive unfolding heart monthsary letter.
-      - 📸 A GSAP-powered, full-color responsive accordion photo gallery ([`AccordionGallery.tsx`](file:///c:/Users/Jian%20Medina/Desktop/LaMoon/src/components/ui/AccordionGallery.tsx)) with smooth transitions and parallax hover details.
+      - 💌 An interactive unfolding heart monthsary letter addressed *"To my Dearest Khayzilene"* in italics, featuring a customized romantic letter from Bebi Jc with a bold, red final I Love You declaration.
+      - 📸 A GSAP-powered, full-color responsive accordion photo and video gallery (*July and August*) referencing assets inside `src/Motmot` (including `.jpg` photo cards and an auto-playing, looping `.mp4` video panel).
+      - 🎵 An embedded YouTube song of the month player ("Stand By Me" by Oasis) with a personalized note card underneath.
 
 ---
 
