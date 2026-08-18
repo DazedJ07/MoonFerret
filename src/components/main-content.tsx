@@ -13,6 +13,7 @@ import type { SubNavTab } from '@/hooks/use-sub-nav';
 import { supabase } from '@/lib/supabase';
 import OutfitBuilder from '@/components/modals/outfit-builder';
 import DashboardView from '@/components/views/dashboard-view';
+import SurpriseView from '@/components/views/surprise-view';
 import CustomSelect from '@/components/ui/custom-select';
 
 interface MainContentProps {
@@ -688,6 +689,7 @@ export default function MainContent({
               )}
               {activeTab === 'my-notes' && <MyNotesView notes={notesList} setNotes={setNotesList} userId={userId} />}
               {activeTab === 'todo-list' && <TodoListView spaces={spaces} />}
+              {activeTab === 'surprise-tab' && <SurpriseView />}
             </div>
           )}
         </motion.div>

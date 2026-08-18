@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 
-export type SubNavTab = 'my-items' | 'my-outfits' | 'my-notes' | 'todo-list';
+export type SubNavTab = 'my-items' | 'my-outfits' | 'my-notes' | 'todo-list' | 'surprise-tab';
 
 export function useSubNav(initialTab: SubNavTab = 'my-items') {
   const [activeTab, setActiveTab] = useState<SubNavTab>(initialTab);

@@ -1,4 +1,4 @@
-import { Home, Plus, Trash2, Shirt, ClipboardList, StickyNote, Folder } from 'lucide-react';
+import { Home, Plus, Trash2, Shirt, ClipboardList, StickyNote, Folder, Heart } from 'lucide-react';
 import type { Space } from '@/data/mock-data';
 import type { ViewId } from '@/hooks/use-navigation';
 
@@ -37,6 +37,7 @@ export default function Sidebar({
     { id: 'outfits', label: 'My Outfits', icon: Shirt, tab: 'my-outfits' },
     { id: 'notes', label: 'My Notes', icon: StickyNote, tab: 'my-notes' },
     { id: 'todo', label: 'Todo List', icon: ClipboardList, tab: 'todo-list' },
+    { id: 'surprise', label: 'Surprise 💖', icon: Heart, tab: 'surprise-tab' },
   ];
 
   return (
