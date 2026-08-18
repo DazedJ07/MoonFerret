@@ -239,7 +239,18 @@ export const AccordionGallery = ({
           >
             <span className="ag-panel__frame">
               <span className="ag-panel__media" ref={(el) => { mediaRefs.current[i] = el; }}>
-                <img src={item.image} alt={item.alt || item.label || ''} draggable="false" />
+                {item.image.toLowerCase().endsWith('.mp4') ? (
+                  <video 
+                    src={item.image} 
+                    autoPlay 
+                    loop 
+                    muted 
+                    playsInline 
+                    className="w-full h-full object-cover pointer-events-none"
+                  />
+                ) : (
+                  <img src={item.image} alt={item.alt || item.label || ''} draggable="false" />
+                )}
               </span>
               <span className="ag-panel__overlay" aria-hidden="true" />
             </span>
